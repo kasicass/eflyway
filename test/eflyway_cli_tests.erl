@@ -7,7 +7,7 @@ usage_test() ->
 
 version_test() ->
     ?assertEqual(0, eflyway_cli:run(["-v"])),
-    ?assertEqual("0.1", eflyway_cli:version()).
+    ?assertEqual("0.1.0", eflyway_cli:version()).
 
 no_command_shows_usage_test() ->
     ?assertEqual(0, eflyway_cli:run([])).
