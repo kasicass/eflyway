@@ -17,16 +17,22 @@
 parse(Url) when is_list(Url) ->
     parse(unicode:characters_to_binary(Url));
 parse(Url) when is_binary(Url) ->
-    case uri_string:parse(Url) of
+    Clean = strip_jdbc(Url),
+    case uri_string:parse(Clean) of
         Map when is_map(Map) ->
             case maps:get(scheme, Map, undefined) of
                 <<"mysql">> -> parse_mysql(Map);
                 <<"sqlite3">> -> parse_sqlite(Map);
+                <<"sqlite">> -> parse_sqlite(Map);
                 Other -> {error, {unsupported_url_scheme, Other}}
             end;
         {error, _, _} ->
             {error, {invalid_url, Url}}
     end.
+
+%% Accept JDBC-style URLs as well (jdbc:mysql://..., jdbc:sqlite:...).
+strip_jdbc(<<"jdbc:", Rest/binary>>) -> Rest;
+strip_jdbc(Url) -> Url.
 
 -spec to_binary(binary() | string() | atom()) -> binary().
 to_binary(B) when is_binary(B) -> B;

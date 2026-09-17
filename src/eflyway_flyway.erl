@@ -68,6 +68,7 @@ with_connection(Config, Fun) ->
             case connect_with_retries(Url, Config#eflyway_config.connect_retries) of
                 {ok, Conn} ->
                     try
+                        maybe_print_database_info(Conn, Config),
                         Builtins = builtins(Conn, Config),
                         Fun(Conn, eflyway_db:dialect(Conn), Builtins)
                     after
@@ -81,6 +82,30 @@ with_connection(Config, Fun) ->
             eflyway_error:raise(invalid_url,
                 [Config#eflyway_config.url], #{reason => Reason})
     end.
+
+%% Prints the connection banner once per process, mirroring Flyway's
+%% DatabaseType.createDatabase(..., printInfo=true).
+maybe_print_database_info(Conn, Config) ->
+    case get(eflyway_db_info_printed) of
+        true -> ok;
+        _ ->
+            put(eflyway_db_info_printed, true),
+            {Product, Version} = eflyway_db:server_info(Conn),
+            Url = filter_url(Config#eflyway_config.url),
+            Description = case Version of
+                              <<>> -> Product;
+                              _ -> <<Product/binary, " ", Version/binary>>
+                          end,
+            eflyway_log:info("Database: ~s (~s)", [Url, Description])
+    end.
+
+%% Strip credentials and query parameters from a URL for display.
+filter_url(Url) ->
+    NoQuery = case binary:split(Url, <<"?">>) of
+                  [U, _] -> U;
+                  [U] -> U
+              end,
+    re:replace(NoQuery, <<"://[^@/]*@">>, <<"://">>, [{return, binary}]).
 
 apply_credentials(Url, Config) ->
     Url1 = case Config#eflyway_config.user of

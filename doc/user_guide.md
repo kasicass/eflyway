@@ -322,7 +322,7 @@ eflyway -url=sqlite3:///tmp/demo.db migrate
 
 ### 6.2 info
 
-打印迁移状态表。
+打印连接信息、当前 schema 版本与迁移状态表（与 Flyway CLI 布局一致）。
 
 ```bash
 eflyway -url=mysql://root:secret@localhost/demo info
@@ -331,15 +331,26 @@ eflyway -url=mysql://root:secret@localhost/demo info
 输出示例：
 
 ```
-+-----------+---------+----------------+------+---------------------+---------+
-| Category  | Version | Description    | Type | Installed On        | State   |
-+-----------+---------+----------------+------+---------------------+---------+
-| Versioned | 1       | create person  | SQL  | 2024-01-01 10:00:00 | Success |
-| Versioned | 2       | add email      | SQL  | 2024-01-02 11:30:00 | Success |
-| Versioned | 3       | add phone      | SQL  |                     | Pending |
-| Repeatable|         | refresh view   | SQL  | 2024-01-02 11:31:00 | Success |
-+-----------+---------+----------------+------+---------------------+---------+
+Database: mysql://localhost:3306/demo (MySQL 8.0)
+Schema version: 2
+
++------------+---------+----------------+------+---------------------+---------+
+| Category   | Version | Description    | Type | Installed On        | State   |
++------------+---------+----------------+------+---------------------+---------+
+| Versioned  | 1       | create person  | SQL  | 2024-01-01 10:00:00 | Success |
+| Versioned  | 2       | add email      | SQL  | 2024-01-02 11:30:00 | Success |
+| Versioned  | 3       | add phone      | SQL  |                     | Pending |
+| Repeatable |         | refresh view   | SQL  | 2024-01-02 11:31:00 | Success |
++------------+---------+----------------+------+---------------------+---------+
+
 ```
+
+说明：
+
+- `Database:` 行在每次运行的首次连接时打印，格式为 `<url> (<产品名> <主版本.次版本>)`，且会隐藏 URL 中的用户名/密码与查询参数；
+- `Schema version:` 为当前已应用的最高版本，空库显示 `<< Empty Schema >>`；
+- 也兼容 JDBC 风格的 URL，如 `-url=jdbc:mysql://...`、`-url=jdbc:sqlite:...`；
+- `Installed On` 不显示毫秒；没有匹配的迁移时表格显示 `No migrations found`。
 
 常见状态：
 

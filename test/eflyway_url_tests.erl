@@ -42,3 +42,14 @@ sqlite_memory_rejected_test() ->
 unsupported_scheme_test() ->
     ?assertEqual({error, {unsupported_url_scheme, <<"postgres">>}},
                  eflyway_url:parse(<<"postgres://host/db">>)).
+
+jdbc_mysql_test() ->
+    {ok, Url} = eflyway_url:parse(<<"jdbc:mysql://user:pass@127.0.0.1:3306/mydb">>),
+    ?assertEqual(mysql, Url#db_url.type),
+    ?assertEqual(<<"mydb">>, Url#db_url.database),
+    ?assertEqual(<<"user">>, Url#db_url.user).
+
+jdbc_sqlite_test() ->
+    {ok, Url} = eflyway_url:parse(<<"jdbc:sqlite:/tmp/app.db">>),
+    ?assertEqual(sqlite, Url#db_url.type),
+    ?assertEqual(<<"/tmp/app.db">>, Url#db_url.path).

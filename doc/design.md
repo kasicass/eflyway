@@ -291,7 +291,7 @@ eflyway/
 
 解析规则（`eflyway_url:parse/1`）：
 
-1. 取 `scheme` 前缀，必须是 `mysql` 或 `sqlite3`，否则报错 `unsupported_url_scheme`。
+1. 先去掉可选的 `jdbc:` 前缀（兼容 `jdbc:mysql://...`、`jdbc:sqlite:...`），再取 `scheme`，必须是 `mysql`、`sqlite3`（或 `sqlite`），否则报错 `unsupported_url_scheme`。
 2. MySQL：解析 `userinfo`、`host`、`port`、`path`（数据库名）、`query`（扩展参数）。
    - URL 中的 user/password 作为默认值；显式 `-user` / `-password` 覆盖。
 3. SQLite3：path 即文件路径；`path` 为空或为 `:memory:` 时直接报错 `in_memory_not_supported`。
@@ -777,10 +777,12 @@ state(Info, Ctx):
 
 ### 10.3 `info`
 
-复刻 `DbInfo`：
+复刻 `DbInfo` 与命令行 `Main.executeOperation("info")` 的输出：
 
-- 以 pending/missing/ignored/future 全 `true` 刷新 info service。
-- 输出表格：`Category | Version | Description | Type | Installed On | State`。
+- 连接时（进程内首次）打印 `Database: <url> (<产品名> <主.次>)`，对应 Flyway `DatabaseType.createDatabase(..., printInfo=true)`；
+- 以 pending/missing/ignored/future 全 `true` 刷新 info service；
+- 打印 `Schema version: <当前版本>`（空库为 `<< Empty Schema >>`）与一个空行；
+- 用 `AsciiTable` 渲染表格：`Category | Version | Description | Type | Installed On | State`，无行时显示 `No migrations found`（横跨整表）；
 - `Category`：synthetic 为空；repeatable 为 `Repeatable`；versioned 为 `Versioned`。
 
 ### 10.4 `baseline`

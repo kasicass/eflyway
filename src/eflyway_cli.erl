@@ -5,10 +5,14 @@
 
 -export([run/1]).
 
+%% Exported for testing.
+-export([render_table/2]).
+
 -define(VERSION, "0.1.0").
 
 -spec run([string()]) -> non_neg_integer().
 run(Args) ->
+    erase(eflyway_db_info_printed),
     case parse(Args, [], #{}, []) of
         {ok, Flags, Options, Commands} ->
             eflyway_log:set_level(level(Flags)),
@@ -125,10 +129,24 @@ run_command(Other, _Config) ->
 %% ---------------------------------------------------------------------
 
 print_info(Infos) ->
+    io:format("Schema version: ~s~n~n", [current_version_display(Infos)]),
     Headers = [<<"Category">>, <<"Version">>, <<"Description">>, <<"Type">>,
                <<"Installed On">>, <<"State">>],
     Rows = [info_row(I) || I <- Infos],
     io:format("~s~n", [render_table(Headers, Rows)]).
+
+current_version_display(Infos) ->
+    case eflyway_info_service:current(Infos) of
+        undefined -> <<"<< Empty Schema >>">>;
+        Info ->
+            case info_version(Info) of
+                undefined -> <<"<< Empty Schema >>">>;
+                V -> eflyway_migration_version:display(V)
+            end
+    end.
+
+info_version(#migration_info{resolved = undefined, applied = A}) -> A#applied.version;
+info_version(#migration_info{resolved = R}) -> R#resolved.version.
 
 info_row(Info) ->
     [category(Info),
@@ -173,45 +191,52 @@ installed_on(#migration_info{applied = undefined}) -> <<>>;
 installed_on(#migration_info{applied = A}) ->
     case A#applied.installed_on of
         undefined -> <<>>;
-        V -> V
+        V -> truncate_seconds(V)
     end.
 
-render_table(Headers, []) ->
-    render_table(Headers, [[<<"No migrations found">>]]);
-render_table(Headers, Rows) ->
-    AllRows = [Headers | Rows],
-    Widths = column_widths(AllRows, length(Headers)),
-    Sep = separator(Widths),
-    Lines = [row_line(Headers, Widths), Sep | [row_line(R, Widths) || R <- Rows]],
-    lists:join(<<"\n">>, Lines).
+%% Flyway renders Installed On as an ISO timestamp without sub-second part.
+truncate_seconds(V) when is_binary(V), byte_size(V) >= 19 -> binary:part(V, 0, 19);
+truncate_seconds(V) -> to_bin(V).
 
-column_widths(Rows, N) ->
-    [lists:max([cell_width(R, I) || R <- Rows]) || I <- lists:seq(1, N)].
+%% Faithful port of org.flywaydb.core.internal.util.AsciiTable.
+render_table(Columns, Rows) ->
+    Widths = column_widths(Columns, Rows),
+    Ruler = ruler_content(Widths),
+    Header = header_line(Columns, Widths),
+    Body = case Rows of
+               [] -> empty_line(byte_size(Ruler), <<"No migrations found">>);
+               _ -> [row_line(R, Widths) || R <- Rows]
+           end,
+    iolist_to_binary([Ruler, "\n", Header, Ruler, "\n", Body, Ruler, "\n"]).
 
-cell_width(Row, I) ->
-    case length(Row) >= I of
-        true -> string:length(lists:nth(I, Row));
-        false -> 0
-    end.
+column_widths(Columns, Rows) ->
+    [lists:max([string:length(C) | [string:length(cell(R, I)) || R <- Rows]])
+     || {C, I} <- lists:zip(Columns, lists:seq(1, length(Columns)))].
+
+cell(Row, I) -> to_bin(lists:nth(I, Row)).
+
+ruler_content(Widths) ->
+    iolist_to_binary([<<"+">>,
+        [[<<"-">>, lists:duplicate(W, $-), <<"-+">>] || W <- Widths]]).
+
+header_line(Columns, Widths) ->
+    Cells = [pad_cell(C, W) || {C, W} <- lists:zip(Columns, Widths)],
+    iolist_to_binary([<<"|">>, [[<<" ">>, Cell, <<" |">>] || Cell <- Cells], <<"\n">>]).
 
 row_line(Row, Widths) ->
-    Cells = lists:zip(Widths, pad_row(Row, length(Widths))),
-    iolist_to_binary([<<"| ">>,
-        lists:join(<<" | ">>, [pad_cell(Cell, W) || {W, Cell} <- Cells]),
-        <<" |">>]).
+    Cells = [pad_cell(to_bin(lists:nth(I, Row)), W)
+             || {W, I} <- lists:zip(Widths, lists:seq(1, length(Widths)))],
+    iolist_to_binary([<<"|">>, [[<<" ">>, Cell, <<" |">>] || Cell <- Cells], <<"\n">>]).
 
-pad_row(Row, N) when length(Row) >= N -> Row;
-pad_row(Row, N) -> Row ++ lists:duplicate(N - length(Row), <<>>).
+%% Flyway: "| " + trimOrPad(emptyText, ruler.length() - 5) + " |\n", where
+%% ruler.length() includes the trailing newline; RulerLen here excludes it.
+empty_line(RulerLen, EmptyText) ->
+    iolist_to_binary([<<"| ">>, pad_cell(EmptyText, RulerLen - 4), <<" |\n">>]).
 
 pad_cell(Cell, Width) ->
     CellBin = to_bin(Cell),
     Pad = Width - string:length(CellBin),
-    iolist_to_binary([CellBin, lists:duplicate(max(Pad, 0), $\s)]).
-
-separator(Widths) ->
-    iolist_to_binary([<<"+">>,
-        lists:join(<<"+">>, [lists:duplicate(W + 2, $-) || W <- Widths]),
-        <<"+">>]).
+    iolist_to_binary([CellBin, lists:duplicate(erlang:max(Pad, 0), $\s)]).
 
 to_bin(B) when is_binary(B) -> B;
 to_bin(L) when is_list(L) -> unicode:characters_to_binary(L);

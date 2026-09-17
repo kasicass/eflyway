@@ -10,6 +10,7 @@
          transaction/2, lock/3,
          supports_ddl_transactions/1, supports_changing_current_schema/1,
          catalog/1, current_user/1, installed_by/2, schema_name/2,
+         server_info/1,
          quote/2, boolean_true/1, boolean_false/1,
          create_history_ddl/3,
          dialect/1,
@@ -38,6 +39,7 @@
 -callback create_history_ddl(Table :: binary(), Baseline :: none | map()) -> [binary()].
 -callback dialect() -> map().
 -callback table_exists(Conn :: term(), Table :: binary()) -> boolean().
+-callback server_info(Conn :: term()) -> {binary(), binary()}.
 -callback all_tables(Conn :: term(), Schema :: binary()) -> [binary()].
 -callback schema_exists(Conn :: term(), Schema :: binary()) -> boolean().
 -callback schema_empty(Conn :: term(), Schema :: binary()) -> boolean().
@@ -81,6 +83,9 @@ current_user(#conn{adapter = Mod, handle = H}) -> Mod:current_user(H).
 schema_name(_Conn, #eflyway_config{schemas = [S | _]}) -> S;
 schema_name(_Conn, #eflyway_config{default_schema = S}) when S =/= undefined -> S;
 schema_name(Conn, _Config) -> catalog(Conn).
+
+%% @doc {ProductName, "Major.Minor"} used for the connection info line.
+server_info(#conn{adapter = Mod, handle = H}) -> Mod:server_info(H).
 
 installed_by(#conn{adapter = Mod, handle = H}, #eflyway_config{installed_by = undefined}) ->
     Mod:current_user(H);

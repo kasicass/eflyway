@@ -14,6 +14,27 @@ no_command_shows_usage_test() ->
 invalid_argument_test() ->
     ?assertEqual(2, eflyway_cli:run(["-bogus"])).
 
+%% Locks the AsciiTable layout to Flyway's (empty table spans full width).
+render_empty_table_test() ->
+    Headers = [<<"Category">>, <<"Version">>, <<"Description">>, <<"Type">>,
+               <<"Installed On">>, <<"State">>],
+    Ruler = <<"+----------+---------+-------------+------+--------------+-------+\n">>,
+    Header = <<"| Category | Version | Description | Type | Installed On | State |\n">>,
+    EmptyRow = <<"| No migrations found", (binary:copy(<<" ">>, 43))/binary, " |\n">>,
+    Expected = <<Ruler/binary, Header/binary, Ruler/binary, EmptyRow/binary, Ruler/binary>>,
+    ?assertEqual(Expected, eflyway_cli:render_table(Headers, [])).
+
+render_rows_table_test() ->
+    Headers = [<<"Category">>, <<"Version">>],
+    Rows = [[<<"Versioned">>, <<"1">>]],
+    Expected = <<
+        "+-----------+---------+\n"
+        "| Category  | Version |\n"
+        "+-----------+---------+\n"
+        "| Versioned | 1       |\n"
+        "+-----------+---------+\n">>,
+    ?assertEqual(Expected, eflyway_cli:render_table(Headers, Rows)).
+
 migrate_and_validate_via_cli_test() ->
     with_env(fun(Dir, Db) ->
         ok = file:write_file(filename:join(Dir, "V1__init.sql"), <<"CREATE TABLE a (id INTEGER);">>),

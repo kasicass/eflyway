@@ -12,6 +12,7 @@
          quote/1, boolean_true/0, boolean_false/0,
          create_history_ddl/2,
          dialect/0,
+         server_info/1,
          table_exists/2, all_tables/2,
          schema_exists/2, schema_empty/2,
          create_schema/2, drop_schema/2, clean_schema/2]).
@@ -162,6 +163,18 @@ baseline_statements(TableQ, #{version := Version, description := Description, in
     ])].
 
 dialect() -> eflyway_parser_sqlite:dialect().
+
+server_info(Conn) ->
+    case query(Conn, <<"SELECT sqlite_version() AS v">>) of
+        {ok, [#{<<"v">> := V}]} -> {<<"SQLite">>, major_minor(to_binary(V))};
+        _ -> {<<"SQLite">>, <<>>}
+    end.
+
+major_minor(Bin) ->
+    case re:run(Bin, "^([0-9]+)\\.([0-9]+)", [{capture, [1, 2], binary}]) of
+        {match, [Maj, Min]} -> <<Maj/binary, ".", Min/binary>>;
+        _ -> <<>>
+    end.
 
 escape(Bin) ->
     binary:replace(Bin, <<"'">>, <<"''">>, [global]).

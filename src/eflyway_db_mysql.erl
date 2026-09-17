@@ -12,6 +12,7 @@
          quote/1, boolean_true/0, boolean_false/0,
          create_history_ddl/2,
          dialect/0,
+         server_info/1,
          table_exists/2, all_tables/2,
          schema_exists/2, schema_empty/2,
          create_schema/2, drop_schema/2, clean_schema/2]).
@@ -132,6 +133,19 @@ boolean_true() -> <<"1">>.
 boolean_false() -> <<"0">>.
 
 dialect() -> eflyway_parser_mysql:dialect().
+
+%% Flyway reports the MySQL product name even when connected to MariaDB.
+server_info(Conn) ->
+    case query(Conn, <<"SELECT VERSION() AS v">>) of
+        {ok, [#{<<"v">> := V}]} -> {<<"MySQL">>, major_minor(to_bin(V))};
+        _ -> {<<"MySQL">>, <<>>}
+    end.
+
+major_minor(Bin) ->
+    case re:run(Bin, "^([0-9]+)\\.([0-9]+)", [{capture, [1, 2], binary}]) of
+        {match, [Maj, Min]} -> <<Maj/binary, ".", Min/binary>>;
+        _ -> <<>>
+    end.
 
 %% ---------------------------------------------------------------------
 %% Schema history DDL
