@@ -64,7 +64,13 @@ query(Conn, Sql) ->
 query(Conn, Sql, []) ->
     to_result(mysql:query(Conn, Sql));
 query(Conn, Sql, Args) ->
-    to_result(mysql:query(Conn, Sql, Args)).
+    to_result(mysql:query(Conn, Sql, normalize_args(Args))).
+
+%% mysql-otp encodes SQL NULL as the atom `null' (not `undefined').
+normalize_args(Args) -> [normalize_arg(A) || A <- Args].
+
+normalize_arg(undefined) -> null;
+normalize_arg(A) -> A.
 
 to_result(ok) -> {ok, []};
 to_result({ok, Cols, Rows}) -> {ok, rows_to_maps(Cols, Rows)};

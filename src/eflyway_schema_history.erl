@@ -192,6 +192,14 @@ get_val(Key, Row) ->
     end.
 
 maybe_bin(undefined) -> undefined;
+maybe_bin({{Y, Mo, D}, {H, Mi, S}}) ->
+    iolist_to_binary(io_lib:format("~4..0B-~2..0B-~2..0B ~2..0B:~2..0B:~2..0B",
+                                   [Y, Mo, D, H, Mi, S]));
+maybe_bin({{Y, Mo, D}, {H, Mi, S, _Micro}}) ->
+    iolist_to_binary(io_lib:format("~4..0B-~2..0B-~2..0B ~2..0B:~2..0B:~2..0B",
+                                   [Y, Mo, D, H, Mi, S]));
+maybe_bin({Y, Mo, D}) ->
+    iolist_to_binary(io_lib:format("~4..0B-~2..0B-~2..0B", [Y, Mo, D]));
 maybe_bin(V) -> to_bin(V).
 
 to_bool(true) -> true;
