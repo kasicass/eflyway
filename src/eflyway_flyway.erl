@@ -3,7 +3,8 @@
 
 -include("eflyway.hrl").
 
--export([migrate/1, with_connection/2]).
+-export([migrate/1, validate/1, info/1, baseline/1, clean/1, repair/1,
+         with_connection/2]).
 
 -spec migrate(#eflyway_config{}) -> map().
 migrate(Config) ->
@@ -11,6 +12,53 @@ migrate(Config) ->
         Resolved = eflyway_resolver:resolve(Config, Dialect, Builtins),
         eflyway_cmd_migrate:migrate(Conn, Config, Resolved)
     end).
+
+-spec validate(#eflyway_config{}) -> map().
+validate(Config) ->
+    with_connection(Config, fun(Conn, Dialect, Builtins) ->
+        Resolved = eflyway_resolver:resolve(Config, Dialect, Builtins),
+        Result = eflyway_cmd_validate:validate(Conn, Config, Resolved),
+        case {maps:get(validation_successful, Result),
+              Config#eflyway_config.clean_on_validation_error} of
+            {false, true} ->
+                _ = eflyway_cmd_clean:clean(Conn, Config),
+                Result;
+            {false, false} ->
+                eflyway_error:raise(validate_error, format_errors(maps:get(errors, Result)));
+            _ ->
+                Result
+        end
+    end).
+
+-spec info(#eflyway_config{}) -> [#migration_info{}].
+info(Config) ->
+    with_connection(Config, fun(Conn, Dialect, Builtins) ->
+        Resolved = eflyway_resolver:resolve(Config, Dialect, Builtins),
+        eflyway_cmd_info:info(Conn, Config, Resolved)
+    end).
+
+-spec baseline(#eflyway_config{}) -> map().
+baseline(Config) ->
+    with_connection(Config, fun(Conn, _Dialect, _Builtins) ->
+        eflyway_cmd_baseline:baseline(Conn, Config)
+    end).
+
+-spec clean(#eflyway_config{}) -> map().
+clean(Config) ->
+    with_connection(Config, fun(Conn, _Dialect, _Builtins) ->
+        eflyway_cmd_clean:clean(Conn, Config)
+    end).
+
+-spec repair(#eflyway_config{}) -> map().
+repair(Config) ->
+    with_connection(Config, fun(Conn, Dialect, Builtins) ->
+        Resolved = eflyway_resolver:resolve(Config, Dialect, Builtins),
+        eflyway_cmd_repair:repair(Conn, Config, Resolved)
+    end).
+
+format_errors(Errors) ->
+    iolist_to_binary(lists:join(<<"\n" >>,
+        [io_lib:format("~s: ~s", [Code, Msg]) || {Code, Msg} <- Errors])).
 
 -spec with_connection(#eflyway_config{}, fun((term(), map(), map()) -> R)) -> R.
 with_connection(Config, Fun) ->
@@ -47,7 +95,7 @@ apply_credentials(Url, Config) ->
 connect_with_retries(Url, Retries) ->
     case eflyway_db:connect(Url) of
         {ok, Conn} -> {ok, Conn};
-        {error, Reason} when Retries > 0 ->
+        {error, _Reason} when Retries > 0 ->
             eflyway_log:warn("Connection failed, retrying in 1 sec ..."),
             timer:sleep(1000),
             connect_with_retries(Url, Retries - 1);

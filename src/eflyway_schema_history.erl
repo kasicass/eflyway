@@ -4,7 +4,9 @@
 -include("eflyway.hrl").
 
 -export([exists/2, create/3, all_applied/2, add_applied/9,
-         add_schemas_marker/3, lock/3, next_rank/2, table_name/1]).
+         add_schemas_marker/3, lock/3, next_rank/2, table_name/1,
+         remove_failed/2, update_applied/4, delete_applied/3,
+         baseline_marker/2, has_schemas_marker/2, has_non_synthetic/2]).
 
 -spec exists(term(), #eflyway_config{}) -> boolean().
 exists(Conn, #eflyway_config{table = Table}) ->
@@ -85,6 +87,77 @@ next_rank(Conn, Config) ->
 
 -spec table_name(#eflyway_config{}) -> binary().
 table_name(#eflyway_config{table = Table}) -> Table.
+
+-spec remove_failed(term(), #eflyway_config{}) -> boolean().
+remove_failed(Conn, #eflyway_config{table = Table} = Config) ->
+    case [A || A <- all_applied(Conn, Config), not A#applied.success] of
+        [] -> false;
+        _ ->
+            Q = fun(Id) -> eflyway_db:quote(Conn, Id) end,
+            Sql = iolist_to_binary(["DELETE FROM ", Q(Table), " WHERE ",
+                                    Q(<<"success">>), " = ", eflyway_db:boolean_false(Conn)]),
+            ok = expect_ok(Conn, Sql),
+            true
+    end.
+
+-spec update_applied(term(), #eflyway_config{}, #applied{}, #resolved{}) -> ok.
+update_applied(Conn, #eflyway_config{table = Table}, Applied, Resolved) ->
+    Q = fun(Id) -> eflyway_db:quote(Conn, Id) end,
+    Sql = iolist_to_binary(["UPDATE ", Q(Table), " SET ",
+        Q(<<"description">>), "=?, ", Q(<<"type">>), "=?, ", Q(<<"checksum">>), "=?",
+        " WHERE ", Q(<<"installed_rank">>), "=?"]),
+    Args = [abbreviate(Resolved#resolved.description, 200),
+            eflyway_migration_type:to_string(Resolved#resolved.type),
+            Resolved#resolved.checksum,
+            Applied#applied.installed_rank],
+    case eflyway_db:query(Conn, Sql, Args) of
+        {ok, _} -> ok;
+        {error, Reason} -> eflyway_error:raise(schema_history_write_failed, [Table], #{reason => Reason})
+    end.
+
+-spec delete_applied(term(), #eflyway_config{}, #applied{}) -> ok.
+delete_applied(Conn, #eflyway_config{table = Table} = Config, Applied) ->
+    Rank = next_rank(Conn, Config),
+    InstalledBy = eflyway_db:installed_by(Conn, Config),
+    Q = fun(Id) -> eflyway_db:quote(Conn, Id) end,
+    Sql = iolist_to_binary([
+        "INSERT INTO ", Q(Table), " (",
+        Q(<<"installed_rank">>), ", ", Q(<<"version">>), ", ", Q(<<"description">>), ", ",
+        Q(<<"type">>), ", ", Q(<<"script">>), ", ", Q(<<"checksum">>), ", ",
+        Q(<<"installed_by">>), ", ", Q(<<"execution_time">>), ", ", Q(<<"success">>),
+        ") VALUES (?, ?, ?, 'DELETE', ?, ?, ?, 0, ?)"]),
+    Args = [Rank,
+            eflyway_migration_version:storage(Applied#applied.version),
+            abbreviate(Applied#applied.description, 200),
+            abbreviate(Applied#applied.script, 1000),
+            Applied#applied.checksum,
+            InstalledBy,
+            bool_int(Applied#applied.success)],
+    case eflyway_db:query(Conn, Sql, Args) of
+        {ok, _} -> ok;
+        {error, Reason} -> eflyway_error:raise(schema_history_write_failed, [Table], #{reason => Reason})
+    end.
+
+-spec baseline_marker(term(), #eflyway_config{}) -> #applied{} | undefined.
+baseline_marker(Conn, Config) ->
+    Applied = all_applied(Conn, Config),
+    Candidates = lists:sublist(Applied, 2),
+    case [A || A <- Candidates, A#applied.type =:= baseline] of
+        [Marker | _] -> Marker;
+        [] -> undefined
+    end.
+
+-spec has_schemas_marker(term(), #eflyway_config{}) -> boolean().
+has_schemas_marker(Conn, Config) ->
+    case all_applied(Conn, Config) of
+        [#applied{type = schema} | _] -> true;
+        _ -> false
+    end.
+
+-spec has_non_synthetic(term(), #eflyway_config{}) -> boolean().
+has_non_synthetic(Conn, Config) ->
+    lists:any(fun(#applied{type = T}) -> not eflyway_migration_type:is_synthetic(T) end,
+              all_applied(Conn, Config)).
 
 %% internal
 
