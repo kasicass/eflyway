@@ -76,7 +76,7 @@ with_connection(Config, Fun) ->
                     end;
                 {error, {database_does_not_exist, Db}} ->
                     eflyway_error:raise(database_does_not_exist,
-                        ["Database ", Db, " does not exist. Create it first."],
+                        ["Database '", Db, "' does not exist. Create it first."],
                         #{database => Db});
                 {error, Reason} ->
                     eflyway_error:raise(connection_failed,
