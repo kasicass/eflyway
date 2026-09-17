@@ -7,11 +7,11 @@
 
 -spec validate(term(), #eflyway_config{}, [#resolved{}]) -> map().
 validate(Conn, Config, Resolved) ->
-    case eflyway_schema_history:exists(Conn, Config) of
+    Schema = eflyway_db:schema_name(Conn, Config),
+    case eflyway_db:schema_exists(Conn, Schema) of
         false ->
             case Resolved =/= [] andalso not Config#eflyway_config.ignore_pending_migrations of
                 true ->
-                    Schema = eflyway_db:schema_name(Conn, Config),
                     #{validation_successful => false, count => 0,
                       errors => [{schema_does_not_exist,
                                   <<"Schema ", Schema/binary, " doesn't exist yet">>}]};

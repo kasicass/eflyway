@@ -583,7 +583,7 @@ get_next_statement(Reader, Ctx):
 
 - `exists/1`：查询元数据/`sqlite_master` 判断表是否存在。
 - `create/3`：创建表；`baseline=true` 时附带插入 baseline 行（MySQL 用 `CREATE TABLE ... AS SELECT`，SQLite 用 `CREATE TABLE` + `INSERT`）。
-- `all_applied/1`：`SELECT ... FROM <table> WHERE installed_rank > ? ORDER BY installed_rank`。
+- `all_applied/1`：先判断表是否存在；不存在时返回空列表（与 Flyway 一致），否则 `SELECT ... FROM <table> WHERE installed_rank > ? ORDER BY installed_rank`。因此 **`info` / `validate` / `repair` 不会创建历史表**，只有 `migrate`（空 schema 路径）与 `baseline` 会创建。
 - `add_applied/...`：计算 `installed_rank = max+1`（SCHEMA 固定 0），插入一行。
 - `lock/3`：MySQL 命名锁；SQLite 直通。
 - `update/2`：repair 时按 `installed_rank` 更新 description/type/checksum。
@@ -767,10 +767,10 @@ state(Info, Ctx):
 复刻 `DbValidate`：
 
 ```
-1. schema history 不存在:
+1. schema 不存在:
        若存在本地迁移且 pending=false -> SCHEMA_DOES_NOT_EXIST 错误
        否则 -> 成功（0 条）
-2. info_service(refresh)
+2. info_service(refresh)   （历史表不存在时 all_applied 返回空）
 3. info_service:validate() -> 错误列表
 4. 空 -> 成功；否则 -> 失败（cleanOnValidationError 时触发 clean）
 ```

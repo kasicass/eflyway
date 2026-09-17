@@ -746,6 +746,14 @@ eflyway -url=... -locations=filesystem:./db/migrations migrate
 eflyway -X -url=... migrate
 ```
 
+### Q9. `info` / `validate` 会自动创建 `flyway_schema_history` 表吗？
+
+不会。与 Flyway 一致：
+
+- `info`、`validate`、`repair` 在历史表不存在时将其视为空（`all_applied` 返回空列表），**不会创建表**；
+- 只有 `migrate`（空 schema 路径）和 `baseline` 会创建历史表；
+- 因此在全新数据库上运行 `info`，会直接把本地迁移显示为 `Pending`，数据库里不会多出任何表。
+
 ---
 
 ## 15. 与官方 Flyway 的差异

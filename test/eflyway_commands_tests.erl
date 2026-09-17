@@ -78,6 +78,27 @@ info_states_test() ->
         ?assertEqual([success, success], States)
     end).
 
+%% info must NOT create the schema history table (matches Flyway).
+info_does_not_create_history_test() ->
+    with_env(fun(Dir, Db) ->
+        write(Dir, "V1__init.sql", <<"CREATE TABLE a (id INTEGER);">>),
+        Config = config(Dir, Db),
+        Infos = eflyway_flyway:info(Config),
+        ?assertEqual([pending], [eflyway_info_service:state(I) || I <- Infos]),
+        with_conn(Config, fun(Conn) ->
+            ?assertNot(eflyway_db:table_exists(Conn, <<"flyway_schema_history">>))
+        end)
+    end).
+
+%% On a fresh schema, validate reports a pending migration (not a missing schema).
+validate_fresh_schema_reports_pending_test() ->
+    with_env(fun(Dir, Db) ->
+        write(Dir, "V1__init.sql", <<"CREATE TABLE a (id INTEGER);">>),
+        Config = config(Dir, Db),
+        ?assertError({eflyway_error, validate_error, _, _},
+                     eflyway_flyway:validate(Config))
+    end).
+
 %% helpers
 
 config(Dir, Db) ->

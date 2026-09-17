@@ -19,7 +19,13 @@ create(Conn, #eflyway_config{table = Table}, Baseline) ->
     ok.
 
 -spec all_applied(term(), #eflyway_config{}) -> [#applied{}].
-all_applied(Conn, #eflyway_config{table = Table}) ->
+all_applied(Conn, #eflyway_config{table = Table} = Config) ->
+    case exists(Conn, Config) of
+        false -> [];
+        true -> all_applied_query(Conn, Table)
+    end.
+
+all_applied_query(Conn, Table) ->
     Q = fun(Id) -> eflyway_db:quote(Conn, Id) end,
     Columns = [<<"installed_rank">>, <<"version">>, <<"description">>, <<"type">>,
                <<"script">>, <<"checksum">>, <<"installed_on">>, <<"installed_by">>,
