@@ -6,9 +6,9 @@
 -export([run/1]).
 
 %% Exported for testing.
--export([render_table/2]).
+-export([render_table/2, version/0]).
 
--define(VERSION, "0.1.0").
+-define(VERSION, "0.1").
 
 -spec run([string()]) -> non_neg_integer().
 run(Args) ->
@@ -102,27 +102,38 @@ run_commands(Commands, Options) ->
             1
     end.
 
-run_command(<<"migrate">>, Config) ->
+run_command(Command, Config) ->
+    print_banner(),
+    execute_command(Command, Config).
+
+execute_command(<<"migrate">>, Config) ->
     eflyway_flyway:migrate(Config),
     ok;
-run_command(<<"validate">>, Config) ->
+execute_command(<<"validate">>, Config) ->
     eflyway_flyway:validate(Config),
     ok;
-run_command(<<"info">>, Config) ->
+execute_command(<<"info">>, Config) ->
     Infos = eflyway_flyway:info(Config),
     print_info(Infos),
     ok;
-run_command(<<"baseline">>, Config) ->
+execute_command(<<"baseline">>, Config) ->
     eflyway_flyway:baseline(Config),
     ok;
-run_command(<<"clean">>, Config) ->
+execute_command(<<"clean">>, Config) ->
     eflyway_flyway:clean(Config),
     ok;
-run_command(<<"repair">>, Config) ->
+execute_command(<<"repair">>, Config) ->
     eflyway_flyway:repair(Config),
     ok;
-run_command(Other, _Config) ->
+execute_command(Other, _Config) ->
     eflyway_error:raise(unknown_command, [Other]).
+
+%% Flyway prints its version banner at the start of every command.
+print_banner() ->
+    eflyway_log:info("eFlyway Version: ~s", [?VERSION]).
+
+-spec version() -> string().
+version() -> ?VERSION.
 
 %% ---------------------------------------------------------------------
 %% info table
@@ -248,7 +259,7 @@ to_bin(I) when is_integer(I) -> integer_to_binary(I).
 %% ---------------------------------------------------------------------
 
 print_version() ->
-    io:format("eflyway ~s~n", [?VERSION]).
+    io:format("eFlyway Version: ~s~n", [?VERSION]).
 
 print_usage() ->
     io:format(

@@ -706,18 +706,20 @@ state(Info, Ctx):
 
 ## 10. 命令流程
 
-所有命令走同一入口 `eflyway_flyway:execute(Command, Config)`：
+所有命令由 `eflyway_cli:run_command/2` 分发到 `eflyway_flyway` 的对应函数（`migrate/1`、`validate/1`、`info/1`、`baseline/1`、`clean/1`、`repair/1`），统一流程：
 
 ```
-1. 校验配置（至少 url；必要时 user/password）。
-2. 解析 URL，选择 DB 适配器，建立连接（connectRetries 重试）。
-3. 确定 schema：schemas / defaultSchema / 当前 schema。
-4. 准备 resource provider（扫描 locations）。
-5. 解析所有迁移（resolver）。
-6. 构造 schema_history。
-7. callback hook（本期为空）。
-8. 分发到具体命令模块。
-9. finally：关闭连接，打印内存/耗时（debug）。
+1. 打印版本横幅 eFlyway Version: 0.1（对应 Flyway 的 VersionPrinter.printVersion，
+   每条命令一次，-q 时抑制）。
+2. 校验配置（至少 url；必要时 user/password）。
+3. 解析 URL，选择 DB 适配器，建立连接（connectRetries 重试）。
+4. 确定 schema：schemas / defaultSchema / 当前 schema。
+5. 准备 resource provider（扫描 locations）。
+6. 解析所有迁移（resolver）。
+7. 构造 schema_history。
+8. callback hook（本期为空）。
+9. 分发到具体命令模块。
+10. finally：关闭连接。
 ```
 
 ### 10.1 `migrate`
