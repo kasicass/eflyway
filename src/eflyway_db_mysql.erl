@@ -4,7 +4,7 @@
 
 -include("eflyway.hrl").
 
--export([connect/1, disconnect/1,
+-export([connect/2, disconnect/1,
          execute/2, query/2, query/3,
          transaction/2, lock/3,
          supports_ddl_transactions/0, supports_changing_current_schema/0,
@@ -21,19 +21,66 @@
 %% Connection
 %% ---------------------------------------------------------------------
 
+%% Connect to the server without selecting a database first (so a missing
+%% database does not abort connection startup), then create/select it.
 connect(#db_url{host = Host, port = Port, user = User, password = Password,
-                database = Database}) ->
+                database = Database}, Config) ->
     Opts = [{host, host(Host)},
             {port, port(Port)},
             {user, str(User)},
             {password, str(Password)},
-            {database, str(Database)},
             {connect_timeout, 10000}],
-    case mysql:start_link(Opts) of
-        {ok, Conn} -> {ok, Conn};
-        {error, Reason} -> {error, {mysql_connect_failed, Reason}};
-        ignore -> {error, {mysql_connect_failed, ignore}}
+    case start_connection(Opts) of
+        {ok, Conn} ->
+            case ensure_database(Conn, Database, Config) of
+                ok -> {ok, Conn};
+                {error, Reason} ->
+                    _ = catch mysql:stop(Conn),
+                    {error, Reason}
+            end;
+        {error, Reason} ->
+            {error, {mysql_connect_failed, Reason}}
     end.
+
+%% mysql:start_link links the connection process; a failed init would otherwise
+%% kill the caller. Trap the (transient) EXIT signal and return a clean error.
+start_connection(Opts) ->
+    OldTrap = process_flag(trap_exit, true),
+    OldLevel = maps:get(level, logger:get_primary_config(), notice),
+    %% Suppress the driver's init crash report; we report a clean error instead.
+    _ = logger:set_primary_config(level, emergency),
+    Result = mysql:start_link(Opts),
+    Result1 = case Result of
+                  {ok, _Conn} -> Result;
+                  {error, _Reason} ->
+                      receive {'EXIT', _Pid, _R} -> ok after 200 -> ok end,
+                      Result;
+                  ignore -> Result
+              end,
+    _ = logger:set_primary_config(level, OldLevel),
+    process_flag(trap_exit, OldTrap),
+    Result1.
+
+ensure_database(_Conn, undefined, _Config) -> ok;
+ensure_database(_Conn, <<>>, _Config) -> ok;
+ensure_database(Conn, Db, Config) ->
+    case schema_exists(Conn, Db) of
+        true -> use(Conn, Db);
+        false ->
+            case Config#eflyway_config.create_schemas of
+                true ->
+                    eflyway_log:info("Database ~s does not exist. Creating database ...", [Db]),
+                    case create_schema(Conn, Db) of
+                        ok -> use(Conn, Db);
+                        {error, Reason} -> {error, Reason}
+                    end;
+                false ->
+                    {error, {database_does_not_exist, Db}}
+            end
+    end.
+
+use(Conn, Db) ->
+    expect_ok(Conn, iolist_to_binary(["USE ", quote(Db)])).
 
 disconnect(Conn) ->
     _ = catch mysql:stop(Conn),

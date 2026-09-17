@@ -5,7 +5,7 @@
 
 -include("eflyway.hrl").
 
--export([connect/1, disconnect/1,
+-export([connect/1, connect/2, disconnect/1,
          execute/2, query/2, query/3,
          transaction/2, lock/3,
          supports_ddl_transactions/1, supports_changing_current_schema/1,
@@ -22,7 +22,7 @@
 %% Behaviour
 %% ---------------------------------------------------------------------
 
--callback connect(Url :: #db_url{}) -> {ok, term()} | {error, term()}.
+-callback connect(Url :: #db_url{}, Config :: #eflyway_config{}) -> {ok, term()} | {error, term()}.
 -callback disconnect(Conn :: term()) -> ok.
 -callback execute(Conn :: term(), Sql :: binary()) -> ok | {error, term()}.
 -callback query(Conn :: term(), Sql :: binary()) -> {ok, [map()]} | {error, term()}.
@@ -52,9 +52,13 @@
 %% ---------------------------------------------------------------------
 
 -spec connect(#db_url{}) -> {ok, #conn{}} | {error, term()}.
-connect(#db_url{type = Type} = Url) ->
+connect(Url) ->
+    connect(Url, eflyway_config:defaults()).
+
+-spec connect(#db_url{}, #eflyway_config{}) -> {ok, #conn{}} | {error, term()}.
+connect(#db_url{type = Type} = Url, Config) ->
     Mod = adapter(Type),
-    case Mod:connect(Url) of
+    case Mod:connect(Url, Config) of
         {ok, Handle} -> {ok, #conn{adapter = Mod, handle = Handle, url = Url}};
         {error, _} = Error -> Error
     end.

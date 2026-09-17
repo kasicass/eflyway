@@ -326,6 +326,11 @@ eflyway/
 ### 5.3 MySQL 适配（`eflyway_db_mysql`）
 
 - 驱动：[`mysql-otp`](https://hex.pm/packages/mysql)（hex 包名 `mysql`），API 使用 `mysql:start_link/1`、`mysql:query/3`、`mysql:transaction/3`。
+- 连接：先不带 `database` 连到服务器（避免未知库导致连接进程 init 失败并把调用方拖死），再：
+  - 库存在 -> `USE \`db\``；
+  - 库不存在且 `createSchemas=true` -> 打印 `Database <db> does not exist. Creating database ...`，`CREATE DATABASE` 后 `USE`；
+  - 库不存在且 `createSchemas=false` -> 返回 `{error, {database_does_not_exist, Db}}`，由引擎转换为一行清晰错误。
+  - `mysql:start_link` 失败时会 flush 链接的 `EXIT` 信号并临时降低 logger level，避免 OTP crash report。
 - 标识符引用：反引号 `` ` ``。
 - 布尔真/假：`1` / `0`。
 - `supports_ddl_transactions() -> false`（DDL 隐式提交，失败无法回滚）。

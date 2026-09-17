@@ -65,7 +65,7 @@ with_connection(Config, Fun) ->
     case eflyway_url:parse(Config#eflyway_config.url) of
         {ok, Url0} ->
             Url = apply_credentials(Url0, Config),
-            case connect_with_retries(Url, Config#eflyway_config.connect_retries) of
+            case connect_with_retries(Url, Config) of
                 {ok, Conn} ->
                     try
                         maybe_print_database_info(Conn, Config),
@@ -74,9 +74,15 @@ with_connection(Config, Fun) ->
                     after
                         eflyway_db:disconnect(Conn)
                     end;
+                {error, {database_does_not_exist, Db}} ->
+                    eflyway_error:raise(database_does_not_exist,
+                        ["Database ", Db, " does not exist. Create it, or enable createSchemas."],
+                        #{database => Db});
                 {error, Reason} ->
                     eflyway_error:raise(connection_failed,
-                        [Config#eflyway_config.url], #{reason => Reason})
+                        ["Unable to connect to ", filter_url(Config#eflyway_config.url),
+                         ": ", format_reason(Reason)],
+                        #{reason => Reason})
             end;
         {error, Reason} ->
             eflyway_error:raise(invalid_url,
@@ -107,6 +113,13 @@ filter_url(Url) ->
               end,
     re:replace(NoQuery, <<"://[^@/]*@">>, <<"://">>, [{return, binary}]).
 
+%% Turn a driver error term into a short human readable message.
+format_reason({mysql_connect_failed, Reason}) -> format_reason(Reason);
+format_reason({sqlite_open_failed, _Path, Reason}) -> format_reason(Reason);
+format_reason({Code, _SqlState, Message}) when is_integer(Code), is_binary(Message) ->
+    [Message, " (", integer_to_binary(Code), ")"];
+format_reason(Reason) -> io_lib:format("~p", [Reason]).
+
 apply_credentials(Url, Config) ->
     Url1 = case Config#eflyway_config.user of
                undefined -> Url;
@@ -117,13 +130,17 @@ apply_credentials(Url, Config) ->
         P -> Url1#db_url{password = P}
     end.
 
-connect_with_retries(Url, Retries) ->
-    case eflyway_db:connect(Url) of
+connect_with_retries(Url, Config) ->
+    connect_with_retries(Url, Config#eflyway_config.connect_retries, Config).
+
+connect_with_retries(Url, Retries, Config) ->
+    case eflyway_db:connect(Url, Config) of
         {ok, Conn} -> {ok, Conn};
+        {error, {database_does_not_exist, _} = Reason} -> {error, Reason};
         {error, _Reason} when Retries > 0 ->
             eflyway_log:warn("Connection failed, retrying in 1 sec ..."),
             timer:sleep(1000),
-            connect_with_retries(Url, Retries - 1);
+            connect_with_retries(Url, Retries - 1, Config);
         {error, Reason} -> {error, Reason}
     end.
 

@@ -5,6 +5,8 @@
 
 -spec main([string()]) -> no_return().
 main(Args) ->
+    %% Keep a crashing linked driver process from killing the CLI.
+    process_flag(trap_exit, true),
     maybe_add_deps(),
     halt(eflyway_cli:run(Args)).
 

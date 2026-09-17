@@ -4,7 +4,7 @@
 
 -include("eflyway.hrl").
 
--export([connect/1, disconnect/1,
+-export([connect/2, disconnect/1,
          execute/2, query/2, query/3,
          transaction/2, lock/3,
          supports_ddl_transactions/0, supports_changing_current_schema/0,
@@ -23,10 +23,25 @@
 %% Connection
 %% ---------------------------------------------------------------------
 
-connect(#db_url{path = Path}) ->
+connect(#db_url{path = Path}, Config) ->
     case esqlite3:open(binary_to_list(Path)) of
         {ok, Db} -> {ok, Db};
-        {error, Reason} -> {error, {sqlite_open_failed, Path, Reason}}
+        {error, Reason} -> maybe_create_dir_and_retry(Path, Reason, Config)
+    end.
+
+%% SQLite creates the database file automatically, but not its parent folder.
+maybe_create_dir_and_retry(Path, Reason, Config) ->
+    Dir = filename:dirname(binary_to_list(Path)),
+    case Config#eflyway_config.create_schemas andalso not filelib:is_dir(Dir) of
+        true ->
+            eflyway_log:info("Database directory ~s does not exist. Creating ...", [Dir]),
+            _ = filelib:ensure_dir(filename:join(Dir, "x")),
+            case esqlite3:open(binary_to_list(Path)) of
+                {ok, Db} -> {ok, Db};
+                {error, Reason2} -> {error, {sqlite_open_failed, Path, Reason2}}
+            end;
+        false ->
+            {error, {sqlite_open_failed, Path, Reason}}
     end.
 
 disconnect(Db) ->

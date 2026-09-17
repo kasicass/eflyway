@@ -765,6 +765,22 @@ eflyway -X -url=... migrate
 - 只有 `migrate`（空 schema 路径）和 `baseline` 会创建历史表；
 - 因此在全新数据库上运行 `info`，会直接把本地迁移显示为 `Pending`，数据库里不会多出任何表。
 
+### Q10. 目标数据库不存在怎么办？
+
+eflyway 不会像 Flyway 那样把“Unknown database”抛成 crash：
+
+- 若 `createSchemas=true`（默认）：连接时自动 `CREATE DATABASE`，并打印 `Database <name> does not exist. Creating database ...`，然后继续执行；
+- 若 `createSchemas=false`：打印一行清晰的错误 `ERROR: database_does_not_exist: Database <name> does not exist. ...`，退出码 1，不会输出 OTP crash 报告；
+- SQLite：会自动创建库文件；若父目录不存在，也会在 `createSchemas=true` 时自动创建目录。
+
+```bash
+# 自动创建数据库并迁移
+eflyway -url=mysql://root:root@127.0.0.1:3306/new_db -locations=filesystem:sql migrate
+
+# 禁止自动创建，给出友好提示
+eflyway -url=mysql://root:root@127.0.0.1:3306/new_db -createSchemas=false migrate
+```
+
 ---
 
 ## 15. 与官方 Flyway 的差异
