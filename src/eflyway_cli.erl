@@ -8,8 +8,6 @@
 %% Exported for testing.
 -export([render_table/2, version/0]).
 
--define(VERSION, "0.1").
-
 -spec run([string()]) -> non_neg_integer().
 run(Args) ->
     erase(eflyway_db_info_printed),
@@ -130,10 +128,21 @@ execute_command(Other, _Config) ->
 
 %% Flyway prints its version banner at the start of every command.
 print_banner() ->
-    eflyway_log:info("eFlyway Version: ~s", [?VERSION]).
+    eflyway_log:info("eFlyway Version: ~s", [version()]).
 
+%% Read the version from the application spec (eflyway.app, generated from
+%% eflyway.app.src). Falls back to "unknown" if the app cannot be loaded.
 -spec version() -> string().
-version() -> ?VERSION.
+version() ->
+    case application:get_key(eflyway, vsn) of
+        {ok, Vsn} -> Vsn;
+        undefined ->
+            _ = application:load(eflyway),
+            case application:get_key(eflyway, vsn) of
+                {ok, Vsn} -> Vsn;
+                _ -> "unknown"
+            end
+    end.
 
 %% ---------------------------------------------------------------------
 %% info table
@@ -259,7 +268,7 @@ to_bin(I) when is_integer(I) -> integer_to_binary(I).
 %% ---------------------------------------------------------------------
 
 print_version() ->
-    io:format("eFlyway Version: ~s~n", [?VERSION]).
+    io:format("eFlyway Version: ~s~n", [version()]).
 
 print_usage() ->
     io:format(

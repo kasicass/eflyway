@@ -709,7 +709,8 @@ state(Info, Ctx):
 所有命令由 `eflyway_cli:run_command/2` 分发到 `eflyway_flyway` 的对应函数（`migrate/1`、`validate/1`、`info/1`、`baseline/1`、`clean/1`、`repair/1`），统一流程：
 
 ```
-1. 打印版本横幅 eFlyway Version: 0.1（对应 Flyway 的 VersionPrinter.printVersion，
+1. 打印版本横幅 eFlyway Version: <vsn>（版本号取自 eflyway.app 的 vsn，即
+   eflyway.app.src 单一来源；对应 Flyway 的 VersionPrinter.printVersion，
    每条命令一次，-q 时抑制）。
 2. 校验配置（至少 url；必要时 user/password）。
 3. 解析 URL，选择 DB 适配器，建立连接（connectRetries 重试）。
