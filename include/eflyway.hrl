@@ -23,6 +23,60 @@
     state = #{} :: map()
 }).
 
+%% A migration version. kind: empty | latest | current | numeric.
+-record(mversion, {
+    kind = numeric :: empty | latest | current | numeric,
+    parts = [] :: [non_neg_integer()],
+    display = <<>> :: binary()
+}).
+
+%% A file discovered on disk.
+-record(resource, {
+    absolute :: binary(),
+    relative :: binary(),
+    filename :: binary()
+}).
+
+%% Result of parsing a migration file name.
+-record(resource_name, {
+    valid = false :: boolean(),
+    prefix :: binary() | undefined,
+    version :: #mversion{} | undefined,
+    separator :: binary() | undefined,
+    description = <<>> :: binary(),
+    raw_description = <<>> :: binary(),
+    suffix = <<>> :: binary(),
+    filename = <<>> :: binary(),
+    validation_message = <<>> :: binary()
+}).
+
+%% A single SQL statement produced by the parser.
+-record(statement, {
+    sql :: binary(),
+    line = 1 :: non_neg_integer(),
+    can_execute_in_transaction = true :: boolean()
+}).
+
+%% A parsed SQL script.
+-record(sql_script, {
+    resource :: #resource{} | undefined,
+    statements = [] :: [#statement{}],
+    executes_in_transaction = true :: boolean()
+}).
+
+%% A migration resolved from disk.
+-record(resolved, {
+    version :: #mversion{} | undefined,
+    description = <<>> :: binary(),
+    script = <<>> :: binary(),
+    checksum :: integer() | undefined,
+    equivalent_checksum :: integer() | undefined,
+    type = sql :: atom(),
+    physical_location = <<>> :: binary(),
+    sql_script :: #sql_script{} | undefined,
+    resource :: #resource{} | undefined
+}).
+
 %% Merged, immutable configuration.
 -record(eflyway_config, {
     url :: binary() | undefined,
