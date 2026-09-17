@@ -1,4 +1,4 @@
-%% @doc CRC32 checksum, replicating org.flywaydb.core.internal.resolver.ChecksumCalculator.
+%% @doc CRC32 checksum (line based, BOM tolerant).
 %%
 %% The checksum is line-ending independent and BOM tolerant: every line
 %% (without its terminator) is fed to CRC32 as UTF-8 bytes.

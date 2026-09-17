@@ -1,7 +1,7 @@
 %% @doc Minimal leveled logger.
 %%
 %% Levels: debug < info < warn < error. Warnings and errors go to stderr,
-%% debug/info go to stdout (matching Flyway's console behaviour).
+%% debug/info go to stdout.
 -module(eflyway_log).
 
 -export([set_level/1, level/0,

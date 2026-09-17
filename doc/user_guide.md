@@ -1,6 +1,6 @@
 # eflyway 用户指南
 
-`eflyway` 是一个用 Erlang 编写的数据库迁移工具，复刻 [Flyway](https://flywaydb.org) 7.5.0 的核心逻辑。
+`eflyway` 是一个用 Erlang 编写的数据库迁移工具。
 它通过 SQL 文件管理数据库版本，支持 **MySQL** 和 **SQLite3**，使用 `-url` 参数选择数据库。
 
 > 架构与实现细节见 [`design.md`](./design.md)。
@@ -23,7 +23,7 @@
 12. [SQL 解析规则与限制](#12-sql-解析规则与限制)
 13. [退出码](#13-退出码)
 14. [常见问题](#14-常见问题)
-15. [与官方 Flyway 的差异](#15-与官方-flyway-的差异)
+15. [功能范围与限制](#15-功能范围与限制)
 
 ---
 
@@ -250,7 +250,7 @@ eflyway [options] command
 | `-schemas` | — | 受管 schema（MySQL 的 database），逗号分隔 |
 | `-defaultSchema` | — | 默认 schema；缺省取 `-schemas` 第一个 |
 | `-baselineVersion` | `1` | baseline 版本 |
-| `-baselineDescription` | `<< Flyway Baseline >>` | baseline 描述 |
+| `-baselineDescription` | `<< Baseline >>` | baseline 描述 |
 | `-baselineOnMigrate` | `false` | 非空库自动 baseline |
 | `-target` | latest | 迁移目标版本 |
 | `-outOfOrder` | `false` | 允许乱序迁移 |
@@ -322,7 +322,7 @@ eflyway -url=sqlite3:///tmp/demo.db migrate
 
 ### 6.2 info
 
-打印连接信息、当前 schema 版本与迁移状态表（与 Flyway CLI 布局一致）。
+打印连接信息、当前 schema 版本与迁移状态表。
 
 ```bash
 eflyway -url=mysql://root:secret@localhost/demo info
@@ -348,7 +348,7 @@ Schema version: 2
 
 说明：
 
-- 每条命令第一行打印版本横幅 `eFlyway Version: 0.1.0`（对应 Flyway 的 `Flyway Community Edition 7.5.0 by Redgate`，可用 `-q` 抑制）；
+- 每条命令第一行打印版本横幅 `eFlyway Version: 0.1.0`（可用 `-q` 抑制）；
 - `Database:` 行在每次运行的首次连接时打印，格式为 `<url> (<产品名> <主版本.次版本>)`，且会隐藏 URL 中的用户名/密码与查询参数；
 - `Schema version:` 为当前已应用的最高版本，空库显示 `<< Empty Schema >>`；
 - 也兼容 JDBC 风格的 URL，如 `-url=jdbc:mysql://...`、`-url=jdbc:sqlite:...`；
@@ -400,7 +400,7 @@ eflyway -url=... \
 
 ### 6.4 baseline
 
-为一个已经有表、但尚未纳入 Flyway 管理的数据库打基线。基线以下（含基线）的迁移会被标记为 `Below Baseline`，不再执行。
+为一个已经有表、但尚未纳入迁移管理的数据库打基线。基线以下（含基线）的迁移会被标记为 `Below Baseline`，不再执行。
 
 ```bash
 eflyway -url=sqlite3:///tmp/demo.db \
@@ -452,7 +452,7 @@ eflyway -url=sqlite3:///tmp/demo.db repair
 
 ### 7.1 配置文件
 
-eflyway 与 Flyway CLI 一致，按顺序加载以下默认配置文件（后加载覆盖先加载，文件不存在则忽略）：
+eflyway 按顺序加载以下默认配置文件（后加载覆盖先加载，文件不存在则忽略）：
 
 1. `<安装目录>/conf/flyway.conf`
 2. `~/.flyway.conf`
@@ -475,7 +475,7 @@ eflyway migrate
 
 ---
 
-> 说明：Flyway 的 **Java 核心库**（`flyway-core`）并不会自动读取 `flyway.conf`，必须通过 `loadDefaultConfigurationFiles()` / `configuration(map)` 显式加载；`flyway.conf` 是**命令行工具**的能力。本设计的配置加载放在 `eflyway_config` 中统一实现。
+> 说明：配置加载统一由 `eflyway_config` 实现，按命令行、环境变量、显式配置文件、默认配置文件的优先级合并。
 
 ### 7.2 环境变量
 
@@ -506,7 +506,7 @@ eflyway migrate
 | `flyway.schemas` | — | 受管 schema |
 | `flyway.defaultSchema` | — | 默认 schema |
 | `flyway.baselineVersion` | `1` | 基线版本 |
-| `flyway.baselineDescription` | `<< Flyway Baseline >>` | 基线描述 |
+| `flyway.baselineDescription` | `<< Baseline >>` | 基线描述 |
 | `flyway.baselineOnMigrate` | `false` | 自动基线 |
 | `flyway.target` | latest | 目标版本 |
 | `flyway.outOfOrder` | `false` | 乱序迁移 |
@@ -603,7 +603,7 @@ SELECT ...;
 
 ## 10. 校验和与验证
 
-eflyway 为每个脚本计算 CRC32 校验和（与 Flyway 一致）：
+eflyway 为每个脚本计算 CRC32 校验和：
 
 - 按行读取，忽略换行符差异（`\n` / `\r\n` 相同）；
 - 忽略 UTF-8 BOM；
@@ -641,7 +641,7 @@ MySQL 无 DDL 事务，迁移失败后会留下半完成的对象，`repair` 只
 
 ## 12. SQL 解析规则与限制
 
-eflyway 与 Flyway 使用相同的解析策略：
+eflyway 的 SQL 解析策略：
 
 - 默认语句分隔符为 `;`；
 - 支持 `--` 行注释、`/* ... */` 块注释（可嵌套）；
@@ -659,7 +659,7 @@ END$$
 DELIMITER ;
 ```
 
-已知限制（与 Flyway 相同）：
+已知限制：
 
 - 某些数据库方言的极端语法可能无法识别；
 - 非 SQL 脚本（Java migration、自定义 resolver）不支持；
@@ -692,7 +692,7 @@ fi
 
 ### Q1. `Found non-empty schema(s) "demo" but no schema history table`
 
-数据库已有对象但从未被 Flyway 管理。两种处理方式：
+数据库已有对象但从未被迁移工具管理。两种处理方式：
 
 ```bash
 # 方式一：打基线
@@ -761,7 +761,7 @@ eflyway -X -url=... migrate
 
 ### Q9. `info` / `validate` 会自动创建 `flyway_schema_history` 表吗？
 
-不会。与 Flyway 一致：
+不会。
 
 - `info`、`validate`、`repair` 在历史表不存在时将其视为空（`all_applied` 返回空列表），**不会创建表**；
 - 只有 `migrate`（空 schema 路径）和 `baseline` 会创建历史表；
@@ -788,21 +788,20 @@ eflyway -url=mysql://root:root@127.0.0.1:3306/new_db -locations=filesystem:sql m
 
 ---
 
-## 15. 与官方 Flyway 的差异
+## 15. 功能范围与限制
 
-eflyway 复刻的是 Flyway 7.5.0 Community 的核心行为，以下能力**暂不支持**：
+eflyway 目前不支持以下能力：
 
-- Java-based migration（`JavaMigration`），明确不实现；
+- Java 编写的迁移，明确不实现；
 - Callback（`beforeMigrate`、`afterMigrate` 等）；
-- `undo`（Teams）；
+- `undo`（回退迁移）；
 - `cherryPick`、`skipExecutingMigrations`、`dryRunOutput`、`errorOverrides`、`stream`、`batch`；
-- 官方 JDBC URL（本项目使用 `mysql://` / `sqlite3://` 形式）；
 - 云端资源（S3/GCS）与 classpath 资源；
 - SQLite 内存库（`:memory:`）——仅支持文件库；
-- Maven / Gradle 插件（Java 专属的构建集成），仅提供独立的 escript CLI；
+- Maven / Gradle 插件，仅提供独立的 escript CLI；
 - MySQL、SQLite 之外的数据库。
 
-除此之外，迁移文件命名、校验和算法、schema history 表结构、迁移状态与命令语义均与 Flyway 7.5.0 对齐，已有项目的迁移脚本可以直接复用。
+除此之外，迁移文件命名、校验和算法、schema history 表结构、迁移状态与命令语义均保持稳定，已有项目的迁移脚本可以直接复用。
 
 ---
 

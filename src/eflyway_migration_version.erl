@@ -1,4 +1,4 @@
-%% @doc Migration version semantics, replicating org.flywaydb.core.api.MigrationVersion.
+%% @doc Migration version semantics.
 -module(eflyway_migration_version).
 
 -include("eflyway.hrl").

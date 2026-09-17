@@ -1,4 +1,4 @@
-%% @doc Migration file name parser, replicating ResourceNameParser.
+%% @doc Migration file name parser.
 -module(eflyway_resource_name).
 
 -include("eflyway.hrl").

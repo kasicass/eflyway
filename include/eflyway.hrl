@@ -134,7 +134,7 @@
     placeholder_suffix = <<"}">> :: binary(),
     placeholders = #{} :: #{binary() => binary()},
     baseline_version = <<"1">> :: binary(),
-    baseline_description = <<"<< Flyway Baseline >>">> :: binary(),
+    baseline_description = <<"<< Baseline >>">> :: binary(),
     baseline_on_migrate = false :: boolean(),
     target = undefined :: binary() | undefined,
     out_of_order = false :: boolean(),

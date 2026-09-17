@@ -1,4 +1,4 @@
-%% @doc Migration state metadata, mirroring org.flywaydb.core.api.MigrationState.
+%% @doc Migration state metadata.
 -module(eflyway_migration_state).
 
 -export([display/1, is_applied/1, is_resolved/1, is_failed/1]).

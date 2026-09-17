@@ -126,7 +126,7 @@ execute_command(<<"repair">>, Config) ->
 execute_command(Other, _Config) ->
     eflyway_error:raise(unknown_command, [Other]).
 
-%% Flyway prints its version banner at the start of every command.
+%% Print the version banner at the start of every command.
 print_banner() ->
     eflyway_log:info("eFlyway Version: ~s", [version()]).
 
@@ -214,11 +214,11 @@ installed_on(#migration_info{applied = A}) ->
         V -> truncate_seconds(V)
     end.
 
-%% Flyway renders Installed On as an ISO timestamp without sub-second part.
+%% Render Installed On as an ISO timestamp without sub-second part.
 truncate_seconds(V) when is_binary(V), byte_size(V) >= 19 -> binary:part(V, 0, 19);
 truncate_seconds(V) -> to_bin(V).
 
-%% Faithful port of org.flywaydb.core.internal.util.AsciiTable.
+%% ASCII table rendering.
 render_table(Columns, Rows) ->
     Widths = column_widths(Columns, Rows),
     Ruler = ruler_content(Widths),
@@ -248,7 +248,7 @@ row_line(Row, Widths) ->
              || {W, I} <- lists:zip(Widths, lists:seq(1, length(Widths)))],
     iolist_to_binary([<<"|">>, [[<<" ">>, Cell, <<" |">>] || Cell <- Cells], <<"\n">>]).
 
-%% Flyway: "| " + trimOrPad(emptyText, ruler.length() - 5) + " |\n", where
+%% Empty row: "| " + trimOrPad(emptyText, ruler.length() - 5) + " |\n", where
 %% ruler.length() includes the trailing newline; RulerLen here excludes it.
 empty_line(RulerLen, EmptyText) ->
     iolist_to_binary([<<"| ">>, pad_cell(EmptyText, RulerLen - 4), <<" |\n">>]).
@@ -293,7 +293,7 @@ print_usage() ->
         "schemas              : Comma-separated list of managed schemas~n"
         "baselineVersion      : Version to tag schema with when executing baseline~n"
         "baselineOnMigrate    : Baseline on migrate against uninitialized non-empty schema~n"
-        "target               : Target version up to which Flyway should use migrations~n"
+        "target               : Target version up to which migrations should be applied~n"
         "outOfOrder           : Allows migrations to be run \"out of order\"~n"
         "placeholderReplacement : Whether placeholders should be replaced~n"
         "placeholders.*       : Custom placeholders (e.g. -placeholders.env=dev)~n"

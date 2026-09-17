@@ -1,8 +1,8 @@
 eflyway
 =======
 
-An Erlang database migration tool, replicating the core behaviour of
-Flyway 7.5.0 for MySQL and SQLite3. The database is selected via `-url`.
+An Erlang database migration tool for MySQL and SQLite3. The database is
+selected via `-url`.
 
 Documentation
 -------------

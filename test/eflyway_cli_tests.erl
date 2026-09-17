@@ -15,7 +15,7 @@ no_command_shows_usage_test() ->
 invalid_argument_test() ->
     ?assertEqual(2, eflyway_cli:run(["-bogus"])).
 
-%% Locks the AsciiTable layout to Flyway's (empty table spans full width).
+%% Locks the table layout (empty table spans full width).
 render_empty_table_test() ->
     Headers = [<<"Category">>, <<"Version">>, <<"Description">>, <<"Type">>,
                <<"Installed On">>, <<"State">>],

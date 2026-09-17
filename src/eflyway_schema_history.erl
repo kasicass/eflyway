@@ -77,7 +77,7 @@ add_applied(Conn, #eflyway_config{table = Table} = Config, Version, Description,
 -spec add_schemas_marker(term(), #eflyway_config{}, [binary()]) -> ok.
 add_schemas_marker(Conn, Config, Schemas) ->
     Script = join(Schemas, <<",">>),
-    add_applied(Conn, Config, undefined, <<"<< Flyway Schema Creation >>">>,
+    add_applied(Conn, Config, undefined, <<"<< Schema Creation >>">>,
                 schema, Script, undefined, 0, true).
 
 -spec lock(term(), #eflyway_config{}, fun(() -> R)) -> R.

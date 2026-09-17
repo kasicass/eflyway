@@ -111,7 +111,7 @@ run(Db, Sql) ->
     end.
 
 %% SQLite has no table level locking; concurrent writes are serialized by the
-%% storage engine. Flyway's SQLiteTable.doLock() is likewise a no-op.
+%% storage engine, so lock/3 is a no-op.
 lock(_Db, _Table, Fun) ->
     Fun().
 

@@ -129,7 +129,7 @@ transaction(Conn, Fun) ->
     end.
 
 lock(Conn, Table, Fun) ->
-    Name = "Flyway-" ++ integer_to_list(erlang:phash2(Table)),
+    Name = "eflyway-" ++ integer_to_list(erlang:phash2(Table)),
     acquire(Conn, Name),
     try
         Fun()
@@ -171,7 +171,7 @@ boolean_false() -> <<"0">>.
 
 dialect() -> eflyway_parser_mysql:dialect().
 
-%% Flyway reports the MySQL product name even when connected to MariaDB.
+%% Report the MySQL product name even when connected to MariaDB.
 server_info(Conn) ->
     case query(Conn, <<"SELECT VERSION() AS v">>) of
         {ok, [#{<<"v">> := V}]} -> {<<"MySQL">>, major_minor(to_bin(V))};

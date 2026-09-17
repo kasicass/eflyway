@@ -1,4 +1,4 @@
-%% @doc Migration type, replicating org.flywaydb.core.api.MigrationType.
+%% @doc Migration type.
 -module(eflyway_migration_type).
 
 -export([is_synthetic/1, is_undo/1, to_string/1, from_string/1]).

@@ -1,7 +1,4 @@
 %% @doc Builds the aggregated migration view and computes states.
-%%
-%% Replicates org.flywaydb.core.internal.info.MigrationInfoServiceImpl.refresh()
-%% and MigrationInfoImpl.getState()/validate().
 -module(eflyway_info_service).
 
 -include("eflyway.hrl").
@@ -497,7 +494,7 @@ checksum_match(R, Applied) ->
 
 key(#mversion{parts = Parts}) -> list_to_tuple(Parts).
 
-%% Sorting, following MigrationInfoImpl.compareTo.
+%% Sorting of migration infos.
 compare_info(A, B) ->
     RankA = rank_of(A),
     RankB = rank_of(B),

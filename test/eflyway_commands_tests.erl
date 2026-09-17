@@ -78,7 +78,7 @@ info_states_test() ->
         ?assertEqual([success, success], States)
     end).
 
-%% info must NOT create the schema history table (matches Flyway).
+%% info must NOT create the schema history table.
 info_does_not_create_history_test() ->
     with_env(fun(Dir, Db) ->
         write(Dir, "V1__init.sql", <<"CREATE TABLE a (id INTEGER);">>),

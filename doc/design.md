@@ -1,14 +1,14 @@
 # eflyway 设计文档
 
-> 基于 `flyway-flyway-7.5.0`（Flyway 7.5.0，Community Edition）源码，用 Erlang/OTP 复刻其核心数据库迁移逻辑。
+> 用 Erlang/OTP 实现的数据库迁移工具。
 > 支持 **MySQL** 与 **SQLite3**，通过 `-url` 参数在两者之间切换。
-> 本文档只描述**重新设计后**的架构；仓库中原有的 `src/eflyway.erl` 桩代码全部废弃。
+> 本文档描述整体架构与实现要点。
 
 ---
 
 ## 1. 背景与目标
 
-Flyway 是一个数据库版本迁移工具，核心思想是：
+数据库版本迁移工具的核心思想是：
 
 - 用文件名约定版本（`V1__init.sql`、`R__view.sql`）。
 - 用一张 **schema history 表** 记录已应用的迁移及其校验和。
@@ -17,26 +17,26 @@ Flyway 是一个数据库版本迁移工具，核心思想是：
 
 本项目（eflyway）的目标：
 
-1. **逻辑等价**：对 SQL 迁移（versioned / repeatable），在 MySQL 与 SQLite3 上复刻 Flyway 7.5.0 的行为，包括：
+1. **行为一致**：对 SQL 迁移（versioned / repeatable），在 MySQL 与 SQLite3 上提供以下能力：
    - 文件名解析、版本比较、校验和计算；
    - SQL 语句解析（分隔符、注释、字符串、块结构）；
    - schema history 表的读写；
    - 迁移状态机（Pending / Success / Missing / Ignored / Future / Failed / Baseline / Outdated / Superseded …）；
    - `migrate / validate / info / baseline / clean / repair` 命令。
-2. **单一可执行入口**：打包成 escript `eflyway`，CLI 形式与官方 `flyway` 接近。
+2. **单一可执行入口**：打包成 escript `eflyway`，以命令行形式使用。
 3. **多数据库**：通过 `-url` 自动选择适配器，采用行为（behaviour）抽象隔离数据库差异。
 4. **可测试**：MySQL 与 SQLite3 都可用真实数据库做端到端测试。
 
 ### 1.1 明确的范围边界（不实现）
 
-以下属于 Flyway Teams / 企业版或与 Java 运行时强绑定的能力，**不在本期范围**：
+以下能力**不在本期范围**：
 
 | 功能 | 说明 |
 |------|------|
-| Java migration / `JavaMigration` | 明确不实现（无 JVM 运行时） |
+| Java 编写的迁移 | 明确不实现（无 JVM 运行时） |
 | Callback（`beforeMigrate` 等） | 首期不实现，预留 hook 点 |
-| `undo` | Teams 专属 |
-| `cherryPick`、`skipExecutingMigrations`、`dryRunOutput`、`errorOverrides`、`stream`、`batch` | Teams 专属 |
+| `undo` | 回退迁移，未实现 |
+| `cherryPick`、`skipExecutingMigrations`、`dryRunOutput`、`errorOverrides`、`stream`、`batch` | 未实现 |
 | `group`、mixed 多语句复杂事务 | 首期可简化，见 §13 |
 | Oracle / PostgreSQL / SQL Server 等 | 仅 MySQL、SQLite3 |
 | JAR/classpath/云端（S3/GCS）资源 | 仅本地文件系统资源 |
@@ -138,35 +138,6 @@ eflyway/
     └── eflyway_mysql_SUITE.erl
 ```
 
-### 3.1 与 Flyway Java 类的对应关系
-
-| Flyway 7.5.0 | eflyway |
-|--------------|---------|
-| `org.flywaydb.core.Flyway` | `eflyway_flyway` |
-| `internal.command.DbMigrate` | `eflyway_cmd_migrate` |
-| `internal.command.DbValidate` | `eflyway_cmd_validate` |
-| `internal.command.DbInfo` | `eflyway_cmd_info` |
-| `internal.command.DbBaseline` | `eflyway_cmd_baseline` |
-| `internal.command.DbClean` | `eflyway_cmd_clean` |
-| `internal.command.DbRepair` | `eflyway_cmd_repair` |
-| `internal.command.DbSchemas` | `eflyway_schema_history`（create schemas 部分） |
-| `internal.info.MigrationInfoServiceImpl` | `eflyway_info_service` |
-| `internal.info.MigrationInfoImpl` | `eflyway_migration_info` |
-| `internal.schemahistory.JdbcTableSchemaHistory` | `eflyway_schema_history` |
-| `internal.resolver.sql.SqlMigrationResolver` | `eflyway_resolver` |
-| `internal.resolver.ChecksumCalculator` | `eflyway_checksum` |
-| `internal.resource.ResourceNameParser` | `eflyway_resource_name` |
-| `internal.parser.Parser` | `eflyway_parser` |
-| `internal.database.mysql.MySQLParser` | `eflyway_parser_mysql` |
-| `internal.database.sqlite.SQLiteParser` | `eflyway_parser_sqlite` |
-| `internal.sqlscript.ParserSqlScript` | `eflyway_sql_script` |
-| `internal.database.base.Database` 及子类 | `eflyway_db` + `eflyway_db_mysql/sqlite` |
-| `api.MigrationVersion` | `eflyway_migration_version` |
-| `api.MigrationState` | `eflyway_migration_state` |
-| `api.MigrationType` | `eflyway_migration_type` |
-| `api.configuration.ClassicConfiguration` | `eflyway_config` |
-| `flyway-commandline.Main/CommandLineArguments` | `eflyway`, `eflyway_cli` |
-
 ---
 
 ## 4. 配置模型
@@ -175,8 +146,8 @@ eflyway/
 
 优先级由低到高：
 
-1. **内置默认值**（与 Flyway 7.5.0 `ClassicConfiguration` 对齐）。
-2. **默认配置文件**（与 Flyway CLI 一致，后加载覆盖先加载）：
+1. **内置默认值**。
+2. **默认配置文件**（后加载覆盖先加载）：
    - `<安装目录>/conf/flyway.conf`
    - `~/.flyway.conf`
    - `<工作目录>/flyway.conf`
@@ -186,7 +157,7 @@ eflyway/
 
 配置在 `eflyway_config:load/1` 中一次性合并，得到不可变记录 `#eflyway_config{}`。
 
-### 4.2 支持的配置项（与 Flyway 7.5.0 默认值一致）
+### 4.2 支持的配置项
 
 | 配置键 | 默认值 | 说明 |
 |--------|--------|------|
@@ -207,7 +178,7 @@ eflyway/
 | `placeholderSuffix` | `}` | 占位符后缀 |
 | `placeholders.*` | — | 自定义占位符键值 |
 | `baselineVersion` | `1` | baseline 版本 |
-| `baselineDescription` | `<< Flyway Baseline >>` | baseline 描述 |
+| `baselineDescription` | `<< Baseline >>` | baseline 描述 |
 | `baselineOnMigrate` | `false` | 非空库自动 baseline |
 | `target` | 空（latest） | 迁移目标版本 |
 | `outOfOrder` | `false` | 允许乱序迁移 |
@@ -228,7 +199,7 @@ eflyway/
 | `configFiles` | — | 显式配置文件列表，逗号分隔（覆盖默认配置文件） |
 | `configFileEncoding` | `UTF-8` | 配置文件编码 |
 
-> 与 Flyway 的差异：不存在 `driver`、`jarDirs`、`callbacks`、`resolvers`、`javaMigrations`、`dryRunOutput`、`licenseKey`、`cherryPick`、`stream`、`batch`、`errorOverrides` 等与 JVM/Teams 绑定的键。
+> 另外不存在 `driver`、`jarDirs`、`callbacks`、`resolvers`、`javaMigrations`、`dryRunOutput`、`licenseKey`、`cherryPick`、`stream`、`batch`、`errorOverrides` 等与 JVM/企业版绑定的键。
 
 ### 4.3 配置记录
 
@@ -333,9 +304,9 @@ eflyway/
 - 标识符引用：反引号 `` ` ``。
 - 布尔真/假：`1` / `0`。
 - `supports_ddl_transactions() -> false`（DDL 隐式提交，失败无法回滚）。
-- 锁：使用 MySQL 命名锁 `GET_LOCK('Flyway-<hash>', 10)` / `RELEASE_LOCK(...)`。
-  - 锁名 discriminator 取 schema history 表全名（含 schema）字符串的 hash，与 Flyway 一致。
-- 历史表 DDL（与 Flyway 7.5.0 `MySQLDatabase.getRawCreateScript` 对齐）：
+- 锁：使用 MySQL 命名锁 `GET_LOCK('eflyway-<hash>', 10)` / `RELEASE_LOCK(...)`。
+  - 锁名 discriminator 取 schema history 表全名（含 schema）字符串的 hash。
+- 历史表 DDL：
 
 ```sql
 CREATE TABLE `flyway_schema_history` (
@@ -364,8 +335,8 @@ CREATE INDEX `flyway_schema_history_s_idx` ON `flyway_schema_history` (`success`
 - 标识符引用：双引号 `"`（也接受反引号与方括号）。
 - 布尔真/假：`1` / `0`。
 - `supports_ddl_transactions() -> true`（SQLite 的 DDL 在事务内可回滚）。
-- 锁：SQLite 不支持表级命名锁，`lock/3` 退化为直接执行（与 Flyway 的 `SQLiteTable.doLock` 一致）；并发写由 SQLite 文件锁与 `BEGIN IMMEDIATE` 保障。
-- 历史表 DDL（与 Flyway 7.5.0 `SQLiteDatabase.getRawCreateScript` 对齐）：
+- 锁：SQLite 不支持表级命名锁，`lock/3` 退化为直接执行；并发写由 SQLite 文件锁与 `BEGIN IMMEDIATE` 保障。
+- 历史表 DDL：
 
 ```sql
 CREATE TABLE "flyway_schema_history" (
@@ -404,7 +375,7 @@ CREATE INDEX "main"."flyway_schema_history_s_idx" ON "flyway_schema_history" ("s
 
 ### 6.2 文件名解析（`eflyway_resource_name`）
 
-复刻 `ResourceNameParser` 的算法：
+文件名解析算法：
 
 1. 从右去掉后缀，得到 `name_without_suffix` 与 `suffix`。
 2. 在前缀集合（按长度降序）中找第一个匹配的前缀：`V`（versioned）、`R`（repeatable）。
@@ -425,7 +396,7 @@ CREATE INDEX "main"."flyway_schema_history_s_idx" ON "flyway_schema_history" ("s
 
 ### 6.3 版本模型（`eflyway_migration_version`）
 
-复刻 `MigrationVersion`：
+版本模型：
 
 - 版本由 `.` 分割为若干非负整数段，逐段数值比较，缺省段按 0 处理；`_` 等价于 `.`。
 - 特殊标记：
@@ -437,7 +408,7 @@ CREATE INDEX "main"."flyway_schema_history_s_idx" ON "flyway_schema_history" ("s
 
 ### 6.4 校验和（`eflyway_checksum`）
 
-复刻 `ChecksumCalculator`：
+校验和算法：
 
 1. 以文本行方式读取文件（UTF-8）。
 2. 去掉第一行的 UTF-8 BOM。
@@ -471,7 +442,7 @@ checksum(File) ->
 
 ## 7. SQL 解析器
 
-解析器负责把 `V1__init.sql` 切成一条条语句，并判断每条语句能否在事务中执行。这是复刻中最难的部分，采用与 Flyway 相同的 **token 驱动 + 记录原文** 方案。
+解析器负责把 `V1__init.sql` 切成一条条语句，并判断每条语句能否在事务中执行。这是实现中最难的部分，采用 **token 驱动 + 记录原文** 方案。
 
 ### 7.1 解析状态（`#pctx{}`）
 
@@ -544,7 +515,7 @@ get_next_statement(Reader, Ctx):
 ### 7.5 分隔符
 
 - 默认 `;`。
-- MySQL 支持脚本内 `DELIMITER $$` 指令，且分隔符变更会跨语句保留（Flyway 的 `resetDelimiter` 被覆写为空操作）。
+- MySQL 支持脚本内 `DELIMITER $$` 指令，且分隔符变更会跨语句保留（解析器在每个语句前不重置分隔符）。
 - 其他数据库每条语句前重置为默认分隔符。
 
 ### 7.6 事务可执行性
@@ -557,7 +528,7 @@ get_next_statement(Reader, Ctx):
 
 ### 7.7 占位符替换（`eflyway_placeholder`）
 
-- 在读取脚本字符流阶段进行（`PlaceholderReplacingReader`）。
+- 在读取脚本字符流阶段进行。
 - 语法：`${key}`，可配置前后缀。
 - 内置占位符：
   - `${flyway:defaultSchema}`、`${flyway:user}`、`${flyway:database}`、`${flyway:timestamp}`、`${flyway:filename}`。
@@ -587,7 +558,7 @@ get_next_statement(Reader, Ctx):
 
 - `exists/1`：查询元数据/`sqlite_master` 判断表是否存在。
 - `create/3`：创建表；`baseline=true` 时附带插入 baseline 行（MySQL 用 `CREATE TABLE ... AS SELECT`，SQLite 用 `CREATE TABLE` + `INSERT`）。
-- `all_applied/1`：先判断表是否存在；不存在时返回空列表（与 Flyway 一致），否则 `SELECT ... FROM <table> WHERE installed_rank > ? ORDER BY installed_rank`。因此 **`info` / `validate` / `repair` 不会创建历史表**，只有 `migrate`（空 schema 路径）与 `baseline` 会创建。
+- `all_applied/1`：先判断表是否存在；不存在时返回空列表，否则 `SELECT ... FROM <table> WHERE installed_rank > ? ORDER BY installed_rank`。因此 **`info` / `validate` / `repair` 不会创建历史表**，只有 `migrate`（空 schema 路径）与 `baseline` 会创建。
 - `add_applied/...`：计算 `installed_rank = max+1`（SCHEMA 固定 0），插入一行。
 - `lock/3`：MySQL 命名锁；SQLite 直通。
 - `update/2`：repair 时按 `installed_rank` 更新 description/type/checksum。
@@ -603,7 +574,7 @@ get_next_statement(Reader, Ctx):
 
 ## 9. 迁移状态机
 
-`eflyway_info_service:refresh/1` 是状态计算核心，复刻 `MigrationInfoServiceImpl.refresh()` 的流程：
+`eflyway_info_service:refresh/1` 是状态计算核心，流程如下：
 
 ```
 输入:
@@ -629,20 +600,20 @@ get_next_statement(Reader, Ctx):
    - 否则该条 out_of_order = true
 4. 若 target == CURRENT -> target = last_applied
 5. 生成 versioned 视图:
-   - applied_versioned 每条: 找 resolved；若匹配则从 pending_resolved 移除；生成 MigrationInfo
-   - 剩余 pending_resolved 生成 MigrationInfo（applied=null）
+   - applied_versioned 每条: 找 resolved；若匹配则从 pending_resolved 移除；生成迁移信息
+   - 剩余 pending_resolved 生成迁移信息（applied=null）
 6. 校验 target 存在（若 target 非 current/latest 且找不到则报错）。
 7. 计算 latest_repeatable_runs（每个 description 的最大 installed_rank）。
 8. 生成 repeatable 视图:
    - 若 rank == latest 且 checksum 匹配 -> 从 pending 移除
-   - 生成 MigrationInfo
-   - 剩余 pending_repeatable 生成 MigrationInfo
-9. 按 MigrationInfo:compare/2 排序。
+   - 生成迁移信息
+   - 剩余 pending_repeatable 生成迁移信息
+9. 按比较函数排序。
 ```
 
 ### 9.1 状态判定（`eflyway_migration_info:state/2`）
 
-状态集合与 Flyway `MigrationState` 一致（名称/display/resolved/applied/failed）：
+状态集合（名称/display/resolved/applied/failed）：
 
 ```
 PENDING / ABOVE_TARGET / BELOW_BASELINE / BASELINE / IGNORED /
@@ -651,7 +622,7 @@ FAILED / OUT_OF_ORDER / FUTURE_SUCCESS / FUTURE_FAILED /
 OUTDATED / SUPERSEDED / DELETED
 ```
 
-判定顺序（简化自 `MigrationInfoImpl.getState`）：
+判定顺序：
 
 ```
 state(Info, Ctx):
@@ -692,7 +663,7 @@ state(Info, Ctx):
 
 ### 9.3 校验规则（`validate/2`）
 
-逐条产出错误（与 `MigrationInfoImpl.validate` 对齐）：
+逐条产出错误：
 
 - `ABOVE_TARGET`、`DELETED`：跳过。
 - failed（且非 future）：`FAILED_VERSIONED_MIGRATION` / `FAILED_REPEATABLE_MIGRATION`。
@@ -710,8 +681,7 @@ state(Info, Ctx):
 
 ```
 1. 打印版本横幅 eFlyway Version: <vsn>（版本号取自 eflyway.app 的 vsn，即
-   eflyway.app.src 单一来源；对应 Flyway 的 VersionPrinter.printVersion，
-   每条命令一次，-q 时抑制）。
+   eflyway.app.src 单一来源，每条命令一次，-q 时抑制）。
 2. 校验配置（至少 url；必要时 user/password）。
 3. 解析 URL，选择 DB 适配器，建立连接（connectRetries 重试）。
 4. 确定 schema：schemas / defaultSchema / 当前 schema。
@@ -725,12 +695,12 @@ state(Info, Ctx):
 
 ### 10.1 `migrate`
 
-复刻 `Flyway.migrate()` + `DbMigrate`：
+migrate 流程：
 
 ```
 1. 若 validateOnMigrate = true:
        先 doValidate(..., pending=true)
-       失败且 cleanOnValidationError=false -> 抛 FlywayValidateException
+       失败且 cleanOnValidationError=false -> 抛出校验错误
        失败且 cleanOnValidationError=true -> doClean
 2. 若 schema history 不存在:
        若非空 schema:
@@ -771,7 +741,7 @@ state(Info, Ctx):
 
 ### 10.2 `validate`
 
-复刻 `DbValidate`：
+校验流程：
 
 ```
 1. schema 不存在:
@@ -784,17 +754,17 @@ state(Info, Ctx):
 
 ### 10.3 `info`
 
-复刻 `DbInfo` 与命令行 `Main.executeOperation("info")` 的输出：
+info 输出：
 
-- 连接时（进程内首次）打印 `Database: <url> (<产品名> <主.次>)`，对应 Flyway `DatabaseType.createDatabase(..., printInfo=true)`；
+- 连接时（进程内首次）打印 `Database: <url> (<产品名> <主.次>)`；
 - 以 pending/missing/ignored/future 全 `true` 刷新 info service；
 - 打印 `Schema version: <当前版本>`（空库为 `<< Empty Schema >>`）与一个空行；
-- 用 `AsciiTable` 渲染表格：`Category | Version | Description | Type | Installed On | State`，无行时显示 `No migrations found`（横跨整表）；
+- 用 ASCII 表格渲染：`Category | Version | Description | Type | Installed On | State`，无行时显示 `No migrations found`（横跨整表）；
 - `Category`：synthetic 为空；repeatable 为 `Repeatable`；versioned 为 `Versioned`。
 
 ### 10.4 `baseline`
 
-复刻 `DbBaseline`：
+基线流程：
 
 ```
 1. schema history 不存在 -> create(baseline=true)，成功。
@@ -809,7 +779,7 @@ state(Info, Ctx):
 
 ### 10.5 `clean`
 
-复刻 `DbClean`：
+清理流程：
 
 ```
 1. cleanDisabled=true -> 报错
@@ -825,7 +795,7 @@ state(Info, Ctx):
 
 ### 10.6 `repair`
 
-复刻 `DbRepair`：
+修复流程：
 
 ```
 1. remove_failed_migrations（删除 success=false 的行）
@@ -843,10 +813,10 @@ state(Info, Ctx):
 
 | 数据库 | 表锁 | 说明 |
 |--------|------|------|
-| MySQL | `GET_LOCK('Flyway-<discriminator>', 10)` + `RELEASE_LOCK` | 命名锁，discriminator 为历史表限定名的 hash |
+| MySQL | `GET_LOCK('eflyway-<discriminator>', 10)` + `RELEASE_LOCK` | 命名锁，discriminator 为历史表限定名的 hash |
 | SQLite | 无显式锁 | 依赖 `BEGIN IMMEDIATE` 与文件锁；`lock/3` 直接执行 |
 
-`lock/3` 的语义与 Flyway 一致：进入时获取，回调结束后释放；`migrateAll` 中每条迁移获取一次锁，`group=false` 时逐条加锁。
+`lock/3` 的语义：进入时获取，回调结束后释放；`migrateAll` 中每条迁移获取一次锁，`group=false` 时逐条加锁。
 
 ---
 
@@ -877,7 +847,7 @@ state(Info, Ctx):
 {eflyway_error, Code :: atom(), Message :: binary(), Details :: map()}
 ```
 
-抛出用 `erlang:error/1`，CLI 顶层捕获并打印，返回非 0 退出码。错误码与 Flyway `ErrorCode` 对齐的部分：
+抛出用 `erlang:error/1`，CLI 顶层捕获并打印，返回非 0 退出码。错误码：
 
 | Code | 含义 |
 |------|------|
@@ -929,7 +899,7 @@ state(Info, Ctx):
 
 ## 17. 关键结论
 
-- Flyway 的本质是「**文件约定 + 历史表 + 状态机**」，其复杂度集中在 **SQL 解析** 与 **状态判定** 两处，设计上应把它们做成无副作用的纯函数模块，便于测试。
+- 迁移工具的本质是「**文件约定 + 历史表 + 状态机**」，其复杂度集中在 **SQL 解析** 与 **状态判定** 两处，设计上应把它们做成无副作用的纯函数模块，便于测试。
 - MySQL 与 SQLite 的差异被收敛到 `eflyway_db` behaviour，尤其是 DDL 事务、表锁、schema 语义、clean 策略四点。
-- 首期以「逻辑等价」为目标，Teams 能力与 JVM 相关能力明确排除。
+- 首期以核心迁移能力为目标，企业版与 JVM 相关能力明确排除。
 - escript + `mysql-otp` / `esqlite` 的组合无需引入 JVM，单文件即可运行。

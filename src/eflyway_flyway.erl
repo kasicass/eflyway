@@ -89,8 +89,7 @@ with_connection(Config, Fun) ->
                 [Config#eflyway_config.url], #{reason => Reason})
     end.
 
-%% Prints the connection banner once per process, mirroring Flyway's
-%% DatabaseType.createDatabase(..., printInfo=true).
+%% Prints the connection banner once per process.
 maybe_print_database_info(Conn, Config) ->
     case get(eflyway_db_info_printed) of
         true -> ok;
