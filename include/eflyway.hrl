@@ -77,6 +77,44 @@
     resource :: #resource{} | undefined
 }).
 
+%% A migration applied to the database (row in the schema history table).
+-record(applied, {
+    installed_rank :: integer(),
+    version :: #mversion{} | undefined,
+    description = <<>> :: binary(),
+    type = sql :: atom(),
+    script = <<>> :: binary(),
+    checksum :: integer() | undefined,
+    installed_on :: binary() | undefined,
+    installed_by :: binary() | undefined,
+    execution_time = 0 :: non_neg_integer(),
+    success = true :: boolean()
+}).
+
+%% Context used to compute migration states.
+-record(mi_context, {
+    out_of_order = false :: boolean(),
+    pending = true :: boolean(),
+    missing = true :: boolean(),
+    ignored = true :: boolean(),
+    future = true :: boolean(),
+    target :: #mversion{} | undefined,
+    baseline :: #mversion{},
+    schema :: #mversion{},
+    last_resolved :: #mversion{},
+    last_applied :: #mversion{},
+    latest_repeatable_runs = #{} :: #{binary() => integer()}
+}).
+
+%% Aggregated view of one migration.
+-record(migration_info, {
+    resolved :: #resolved{} | undefined,
+    applied :: #applied{} | undefined,
+    out_of_order = false :: boolean(),
+    deleted = false :: boolean(),
+    context :: #mi_context{} | undefined
+}).
+
 %% Merged, immutable configuration.
 -record(eflyway_config, {
     url :: binary() | undefined,

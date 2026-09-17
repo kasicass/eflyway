@@ -11,6 +11,7 @@
          catalog/1, current_user/1,
          quote/1, boolean_true/0, boolean_false/0,
          create_history_ddl/2,
+         dialect/0,
          table_exists/2, all_tables/2,
          schema_exists/2, schema_empty/2,
          create_schema/2, drop_schema/2, clean_schema/2]).
@@ -159,6 +160,8 @@ baseline_statements(TableQ, #{version := Version, description := Description, in
         "1, '", escape(Version), "', '", escape(Description), "', 'BASELINE', '",
         escape(Description), "', NULL, '", escape(InstalledBy), "', 0, 1);"
     ])].
+
+dialect() -> eflyway_parser_sqlite:dialect().
 
 escape(Bin) ->
     binary:replace(Bin, <<"'">>, <<"''">>, [global]).

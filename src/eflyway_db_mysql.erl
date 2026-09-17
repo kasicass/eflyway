@@ -13,6 +13,7 @@
          catalog/1, current_user/1,
          quote/1, boolean_true/0, boolean_false/0,
          create_history_ddl/2,
+         dialect/0,
          table_exists/2, all_tables/2,
          schema_exists/2, schema_empty/2,
          create_schema/2, drop_schema/2, clean_schema/2]).
@@ -35,6 +36,7 @@ quote(Identifier) -> <<"`", Identifier/binary, "`">>.
 boolean_true() -> <<"1">>.
 boolean_false() -> <<"0">>.
 create_history_ddl(_, _) -> [].
+dialect() -> eflyway_parser_mysql:dialect().
 table_exists(_, _) -> false.
 all_tables(_, _) -> [].
 schema_exists(_, _) -> false.

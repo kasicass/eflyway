@@ -25,9 +25,10 @@ resolve_one(Resource, Config, Dialect, Builtins) ->
                 false -> false
             end;
         true ->
+            Builtins1 = maps:put(<<"flyway:filename">>, Resource#resource.filename, Builtins),
             Repeatable = Name#resource_name.prefix =:= Config#eflyway_config.repeatable_prefix,
-            {Checksum, Equivalent} = checksums(Resource, Config, Builtins, Repeatable),
-            Script = eflyway_sql_script:parse(Resource, Config, Dialect, Builtins),
+            {Checksum, Equivalent} = checksums(Resource, Config, Builtins1, Repeatable),
+            Script = eflyway_sql_script:parse(Resource, Config, Dialect, Builtins1),
             {true, #resolved{
                 version = case Repeatable of true -> undefined; false -> Name#resource_name.version end,
                 description = Name#resource_name.description,

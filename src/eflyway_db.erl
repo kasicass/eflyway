@@ -9,9 +9,10 @@
          execute/2, query/2, query/3,
          transaction/2, lock/3,
          supports_ddl_transactions/1, supports_changing_current_schema/1,
-         catalog/1, current_user/1, installed_by/2,
+         catalog/1, current_user/1, installed_by/2, schema_name/2,
          quote/2, boolean_true/1, boolean_false/1,
          create_history_ddl/3,
+         dialect/1,
          table_exists/2, all_tables/2,
          schema_exists/2, schema_empty/2,
          create_schema/2, drop_schema/2, clean_schema/2]).
@@ -35,6 +36,7 @@
 -callback boolean_true() -> binary().
 -callback boolean_false() -> binary().
 -callback create_history_ddl(Table :: binary(), Baseline :: none | map()) -> [binary()].
+-callback dialect() -> map().
 -callback table_exists(Conn :: term(), Table :: binary()) -> boolean().
 -callback all_tables(Conn :: term(), Schema :: binary()) -> [binary()].
 -callback schema_exists(Conn :: term(), Schema :: binary()) -> boolean().
@@ -66,14 +68,19 @@ query(#conn{adapter = Mod, handle = H}, Sql, Args) -> Mod:query(H, Sql, Args).
 
 transaction(#conn{adapter = Mod, handle = H} = Conn, Fun) -> Mod:transaction(H, fun() -> Fun(Conn) end).
 
-lock(#conn{adapter = Mod, handle = H} = Conn, Table, Fun) ->
-    Mod:lock(H, Table, fun() -> Fun(Conn) end).
+lock(#conn{adapter = Mod, handle = H}, Table, Fun) ->
+    Mod:lock(H, Table, Fun).
 
 supports_ddl_transactions(#conn{adapter = Mod}) -> Mod:supports_ddl_transactions().
 supports_changing_current_schema(#conn{adapter = Mod}) -> Mod:supports_changing_current_schema().
 
 catalog(#conn{adapter = Mod, handle = H}) -> Mod:catalog(H).
 current_user(#conn{adapter = Mod, handle = H}) -> Mod:current_user(H).
+
+%% The effective schema managed for this run.
+schema_name(_Conn, #eflyway_config{schemas = [S | _]}) -> S;
+schema_name(_Conn, #eflyway_config{default_schema = S}) when S =/= undefined -> S;
+schema_name(Conn, _Config) -> catalog(Conn).
 
 installed_by(#conn{adapter = Mod, handle = H}, #eflyway_config{installed_by = undefined}) ->
     Mod:current_user(H);
@@ -85,6 +92,8 @@ boolean_true(#conn{adapter = Mod}) -> Mod:boolean_true().
 boolean_false(#conn{adapter = Mod}) -> Mod:boolean_false().
 
 create_history_ddl(#conn{adapter = Mod}, Table, Baseline) -> Mod:create_history_ddl(Table, Baseline).
+
+dialect(#conn{adapter = Mod}) -> Mod:dialect().
 
 table_exists(#conn{adapter = Mod, handle = H}, Table) -> Mod:table_exists(H, Table).
 all_tables(#conn{adapter = Mod, handle = H}, Schema) -> Mod:all_tables(H, Schema).
