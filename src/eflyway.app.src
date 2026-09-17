@@ -1,5 +1,5 @@
 {application, eflyway, [
-    {description, "An escript"},
+    {description, "Erlang database migration tool (Flyway 7.5.0 compatible), MySQL and SQLite3"},
     {vsn, "0.1.0"},
     {registered, []},
     {applications, [
@@ -10,4 +10,4 @@
     {modules, []},
     {licenses, ["Apache-2.0"]},
     {links, []}
- ]}.
+]}.
