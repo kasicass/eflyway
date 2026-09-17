@@ -1,37 +1,35 @@
 %% @doc eflyway escript entry point.
-%%
-%% Full CLI wiring lands in a later phase; for now this exposes the version
-%% and usage so the escript can be built and smoke tested.
 -module(eflyway).
 
 -export([main/1]).
 
 -spec main([string()]) -> no_return().
 main(Args) ->
-    case Args of
-        [] ->
-            print_usage(),
-            halt(0);
-        ["-?"] ->
-            print_usage(),
-            halt(0);
-        ["-v"] ->
-            io:format("eflyway 0.1.0~n"),
-            halt(0);
-        _ ->
-            io:format(standard_error, "eflyway: CLI not implemented yet: ~p~n", [Args]),
-            halt(2)
-    end.
+    maybe_add_deps(),
+    halt(eflyway_cli:run(Args)).
 
-print_usage() ->
-    io:format("Usage~n"),
-    io:format("=====~n~n"),
-    io:format("eflyway [options] command~n~n"),
-    io:format("Commands~n"),
-    io:format("--------~n"),
-    io:format("migrate  : Migrates the database~n"),
-    io:format("clean    : Drops all objects in the configured schemas~n"),
-    io:format("info     : Prints the information about applied, current and pending migrations~n"),
-    io:format("validate : Validates the applied migrations against the ones on disk~n"),
-    io:format("baseline : Baselines an existing database at the baselineVersion~n"),
-    io:format("repair   : Repairs the schema history table~n").
+%% SQLite is provided by a NIF which cannot be loaded from inside an escript
+%% archive. When running from the build tree, add the sibling lib/ directory
+%% (containing esqlite and mysql) to the code path so code:priv_dir/1 resolves
+%% to a real directory.
+maybe_add_deps() ->
+    try
+        Script = escript:script_name(),
+        Root = filename:dirname(filename:dirname(filename:absname(Script))),
+        LibDir = filename:join(Root, "lib"),
+        case filelib:is_dir(LibDir) of
+            true ->
+                case file:list_dir(LibDir) of
+                    {ok, Apps} ->
+                        Paths = [filename:join([LibDir, App, "ebin"])
+                                 || App <- Apps,
+                                    filelib:is_dir(filename:join([LibDir, App, "ebin"]))],
+                        code:add_pathsa(Paths),
+                        ok;
+                    {error, _} -> ok
+                end;
+            false -> ok
+        end
+    catch
+        _:_ -> ok
+    end.

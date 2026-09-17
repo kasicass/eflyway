@@ -62,18 +62,23 @@ eflyway 的核心工作方式：
 rebar3 escriptize
 ```
 
-生成的单文件可执行程序位于：
+生成的可执行程序位于：
 
 ```
 _build/default/bin/eflyway
 ```
 
-把它复制到 `PATH` 中即可全局使用：
+直接运行（脚本会在启动时把同级的 `_build/default/lib` 加入代码路径，以便加载 SQLite 的 NIF 驱动）：
 
 ```bash
-cp _build/default/bin/eflyway /usr/local/bin/
-eflyway -? 
+_build/default/bin/eflyway -?
 ```
+
+> 注意：SQLite 驱动 `esqlite` 是一个 NIF，无法从 escript 归档内部加载。若要把 escript 移到其他位置，请同时保留 `lib` 目录（或设置 `ERL_LIBS` 指向它）。也可以直接用 `erl` 运行：
+>
+> ```bash
+> erl -noshell -pa _build/default/lib/*/ebin -s eflyway main -- -url=... migrate
+> ```
 
 ### 2.3 从源码运行
 
