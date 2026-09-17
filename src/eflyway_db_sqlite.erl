@@ -23,25 +23,15 @@
 %% Connection
 %% ---------------------------------------------------------------------
 
-connect(#db_url{path = Path}, Config) ->
+connect(#db_url{path = Path}, _Config) ->
     case esqlite3:open(binary_to_list(Path)) of
         {ok, Db} -> {ok, Db};
-        {error, Reason} -> maybe_create_dir_and_retry(Path, Reason, Config)
-    end.
-
-%% SQLite creates the database file automatically, but not its parent folder.
-maybe_create_dir_and_retry(Path, Reason, Config) ->
-    Dir = filename:dirname(binary_to_list(Path)),
-    case Config#eflyway_config.create_schemas andalso not filelib:is_dir(Dir) of
-        true ->
-            eflyway_log:info("Database directory ~s does not exist. Creating ...", [Dir]),
-            _ = filelib:ensure_dir(filename:join(Dir, "x")),
-            case esqlite3:open(binary_to_list(Path)) of
-                {ok, Db} -> {ok, Db};
-                {error, Reason2} -> {error, {sqlite_open_failed, Path, Reason2}}
-            end;
-        false ->
-            {error, {sqlite_open_failed, Path, Reason}}
+        {error, Reason} ->
+            Dir = filename:dirname(binary_to_list(Path)),
+            case filelib:is_dir(Dir) of
+                false -> {error, {sqlite_directory_does_not_exist, Dir}};
+                true -> {error, {sqlite_open_failed, Path, Reason}}
+            end
     end.
 
 disconnect(Db) ->

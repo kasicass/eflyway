@@ -63,20 +63,10 @@ start_connection(Opts) ->
 
 ensure_database(_Conn, undefined, _Config) -> ok;
 ensure_database(_Conn, <<>>, _Config) -> ok;
-ensure_database(Conn, Db, Config) ->
+ensure_database(Conn, Db, _Config) ->
     case schema_exists(Conn, Db) of
         true -> use(Conn, Db);
-        false ->
-            case Config#eflyway_config.create_schemas of
-                true ->
-                    eflyway_log:info("Database ~s does not exist. Creating database ...", [Db]),
-                    case create_schema(Conn, Db) of
-                        ok -> use(Conn, Db);
-                        {error, Reason} -> {error, Reason}
-                    end;
-                false ->
-                    {error, {database_does_not_exist, Db}}
-            end
+        false -> {error, {database_does_not_exist, Db}}
     end.
 
 use(Conn, Db) ->

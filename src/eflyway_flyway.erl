@@ -76,7 +76,7 @@ with_connection(Config, Fun) ->
                     end;
                 {error, {database_does_not_exist, Db}} ->
                     eflyway_error:raise(database_does_not_exist,
-                        ["Database ", Db, " does not exist. Create it, or enable createSchemas."],
+                        ["Database ", Db, " does not exist. Create it first."],
                         #{database => Db});
                 {error, Reason} ->
                     eflyway_error:raise(connection_failed,
@@ -116,6 +116,8 @@ filter_url(Url) ->
 %% Turn a driver error term into a short human readable message.
 format_reason({mysql_connect_failed, Reason}) -> format_reason(Reason);
 format_reason({sqlite_open_failed, _Path, Reason}) -> format_reason(Reason);
+format_reason({sqlite_directory_does_not_exist, Dir}) ->
+    ["Directory ", Dir, " does not exist. Create it first"];
 format_reason({Code, _SqlState, Message}) when is_integer(Code), is_binary(Message) ->
     [Message, " (", integer_to_binary(Code), ")"];
 format_reason(Reason) -> io_lib:format("~p", [Reason]).

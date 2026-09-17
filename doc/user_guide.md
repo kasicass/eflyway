@@ -767,18 +767,21 @@ eflyway -X -url=... migrate
 
 ### Q10. 目标数据库不存在怎么办？
 
-eflyway 不会像 Flyway 那样把“Unknown database”抛成 crash：
+eflyway **不会自动创建数据库**，也不会把 “Unknown database” 抛成 crash，而是打印一行友好提示并退出（退出码 1）：
 
-- 若 `createSchemas=true`（默认）：连接时自动 `CREATE DATABASE`，并打印 `Database <name> does not exist. Creating database ...`，然后继续执行；
-- 若 `createSchemas=false`：打印一行清晰的错误 `ERROR: database_does_not_exist: Database <name> does not exist. ...`，退出码 1，不会输出 OTP crash 报告；
-- SQLite：会自动创建库文件；若父目录不存在，也会在 `createSchemas=true` 时自动创建目录。
+```
+ERROR: database_does_not_exist: Database new_db does not exist. Create it first.
+```
+
+- MySQL：连接时先不带 database 连到服务器，检测到库不存在即返回上述提示，不执行 `CREATE DATABASE`；
+- SQLite：库文件本身由 SQLite 自动创建，但其**父目录必须已存在**；否则提示 `Directory ... does not exist. Create it first`；
+- `createSchemas` 不再触发数据库/目录的自动创建。
+
+先手动创建数据库，再执行迁移：
 
 ```bash
-# 自动创建数据库并迁移
+mysql -uroot -p -e "CREATE DATABASE new_db"
 eflyway -url=mysql://root:root@127.0.0.1:3306/new_db -locations=filesystem:sql migrate
-
-# 禁止自动创建，给出友好提示
-eflyway -url=mysql://root:root@127.0.0.1:3306/new_db -createSchemas=false migrate
 ```
 
 ---

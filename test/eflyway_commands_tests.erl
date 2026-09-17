@@ -99,37 +99,16 @@ validate_fresh_schema_reports_pending_test() ->
                      eflyway_flyway:validate(Config))
     end).
 
-%% SQLite creates the database file but not its parent folder.
-sqlite_creates_missing_directory_test() ->
-    Base = filename:join("/tmp", "eflyway_mkdir_"
-                         ++ integer_to_list(erlang:unique_integer([positive]))),
-    Db = filename:join([Base, "nested", "app.db"]),
-    Dir = filename:join("/tmp", "eflyway_mkdir_src_"
-                        ++ integer_to_list(erlang:unique_integer([positive]))),
-    ok = file:make_dir(Dir),
-    ok = file:write_file(filename:join(Dir, "V1__init.sql"), <<"CREATE TABLE a (id INTEGER);">>),
-    Config = (eflyway_config:defaults())#eflyway_config{
-        url = <<"sqlite3://", (to_bin(Db))/binary>>,
-        locations = [<<"filesystem:", (to_bin(Dir))/binary>>]},
-    eflyway_log:set_level(warn),
-    try
-        eflyway_flyway:migrate(Config),
-        ?assert(filelib:is_regular(Db))
-    after
-        file:del_dir_r(Dir),
-        file:del_dir_r(Base),
-        eflyway_log:set_level(info)
-    end.
-
-sqlite_missing_directory_disabled_test() ->
+%% SQLite creates the database file, but the parent directory must exist.
+sqlite_missing_directory_test() ->
     Base = filename:join("/tmp", "eflyway_nodir_"
                          ++ integer_to_list(erlang:unique_integer([positive]))),
     Db = filename:join([Base, "nested", "app.db"]),
     Config = (eflyway_config:defaults())#eflyway_config{
-        url = <<"sqlite3://", (to_bin(Db))/binary>>,
-        create_schemas = false},
+        url = <<"sqlite3://", (to_bin(Db))/binary>>},
     ?assertError({eflyway_error, connection_failed, _, _},
-                 eflyway_flyway:info(Config)).
+                 eflyway_flyway:info(Config)),
+    ?assertNot(filelib:is_dir(Base)).
 
 %% helpers
 
