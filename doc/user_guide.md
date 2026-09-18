@@ -351,7 +351,6 @@ Schema version: 2
 - 每条命令第一行打印版本横幅 `eFlyway Version: 0.1.0`（可用 `-q` 抑制）；
 - `Database:` 行在每次运行的首次连接时打印，格式为 `<url> (<产品名> <主版本.次版本>)`，且会隐藏 URL 中的用户名/密码与查询参数；
 - `Schema version:` 为当前已应用的最高版本，空库显示 `<< Empty Schema >>`；
-- 也兼容 JDBC 风格的 URL，如 `-url=jdbc:mysql://...`、`-url=jdbc:sqlite:...`；
 - `Installed On` 不显示毫秒；没有匹配的迁移时表格显示 `No migrations found`。
 
 常见状态：
