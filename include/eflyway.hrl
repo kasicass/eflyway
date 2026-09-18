@@ -3,6 +3,14 @@
 -ifndef(EFLYWAY_HRL).
 -define(EFLYWAY_HRL, true).
 
+%% Fixed migration naming convention (not configurable):
+%%   V<version>__<description>.sql   (versioned)
+%%   R__<description>.sql            (repeatable)
+-define(SQL_MIGRATION_PREFIX, <<"V">>).
+-define(REPEATABLE_PREFIX, <<"R">>).
+-define(MIGRATION_SEPARATOR, <<"__">>).
+-define(MIGRATION_SUFFIXES, [<<".sql">>]).
+
 %% Parsed database URL.
 -record(db_url, {
     type :: mysql | sqlite,
@@ -125,10 +133,6 @@
     schemas = [] :: [binary()],
     default_schema = undefined :: binary() | undefined,
     encoding = utf8 :: utf8 | latin1,
-    sql_migration_prefix = <<"V">> :: binary(),
-    repeatable_prefix = <<"R">> :: binary(),
-    separator = <<"__">> :: binary(),
-    suffixes = [<<".sql">>] :: [binary()],
     placeholder_replacement = true :: boolean(),
     placeholder_prefix = <<"${">> :: binary(),
     placeholder_suffix = <<"}">> :: binary(),

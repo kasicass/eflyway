@@ -42,10 +42,6 @@ set_field(C, <<"table">>, V) -> C#eflyway_config{table = V};
 set_field(C, <<"schemas">>, V) -> C#eflyway_config{schemas = split_list(V)};
 set_field(C, <<"defaultSchema">>, V) -> C#eflyway_config{default_schema = V};
 set_field(C, <<"encoding">>, V) -> C#eflyway_config{encoding = parse_encoding(V)};
-set_field(C, <<"sqlMigrationPrefix">>, V) -> C#eflyway_config{sql_migration_prefix = V};
-set_field(C, <<"repeatableSqlMigrationPrefix">>, V) -> C#eflyway_config{repeatable_prefix = V};
-set_field(C, <<"sqlMigrationSeparator">>, V) -> C#eflyway_config{separator = V};
-set_field(C, <<"sqlMigrationSuffixes">>, V) -> C#eflyway_config{suffixes = split_list(V)};
 set_field(C, <<"placeholderReplacement">>, V) -> C#eflyway_config{placeholder_replacement = parse_bool(V)};
 set_field(C, <<"placeholderPrefix">>, V) -> C#eflyway_config{placeholder_prefix = V};
 set_field(C, <<"placeholderSuffix">>, V) -> C#eflyway_config{placeholder_suffix = V};
@@ -106,8 +102,6 @@ normalize(Str) ->
 known_keys() ->
     [<<"url">>, <<"user">>, <<"password">>, <<"locations">>, <<"table">>,
      <<"schemas">>, <<"defaultSchema">>, <<"encoding">>,
-     <<"sqlMigrationPrefix">>, <<"repeatableSqlMigrationPrefix">>,
-     <<"sqlMigrationSeparator">>, <<"sqlMigrationSuffixes">>,
      <<"placeholderReplacement">>, <<"placeholderPrefix">>, <<"placeholderSuffix">>,
      <<"baselineVersion">>, <<"baselineDescription">>, <<"baselineOnMigrate">>,
      <<"target">>, <<"outOfOrder">>,

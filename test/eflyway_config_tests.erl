@@ -6,10 +6,6 @@
 defaults_test() ->
     C = eflyway_config:defaults(),
     ?assertEqual(<<"flyway_schema_history">>, C#eflyway_config.table),
-    ?assertEqual(<<"V">>, C#eflyway_config.sql_migration_prefix),
-    ?assertEqual(<<"R">>, C#eflyway_config.repeatable_prefix),
-    ?assertEqual(<<"__">>, C#eflyway_config.separator),
-    ?assertEqual([<<".sql">>], C#eflyway_config.suffixes),
     ?assertEqual(<<"1">>, C#eflyway_config.baseline_version),
     ?assertEqual(true, C#eflyway_config.validate_on_migrate),
     ?assertEqual(true, C#eflyway_config.placeholder_replacement),

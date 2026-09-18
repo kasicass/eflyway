@@ -16,7 +16,7 @@ resolve(Config, Dialect, Builtins) ->
     sort(Resolved).
 
 resolve_one(Resource, Config, Dialect, Builtins) ->
-    #resource_name{} = Name = eflyway_resource_name:parse(Resource#resource.filename, Config),
+    #resource_name{} = Name = eflyway_resource_name:parse(Resource#resource.filename),
     case Name#resource_name.valid of
         false ->
             case Config#eflyway_config.validate_migration_naming of
@@ -26,7 +26,7 @@ resolve_one(Resource, Config, Dialect, Builtins) ->
             end;
         true ->
             Builtins1 = maps:put(<<"flyway:filename">>, Resource#resource.filename, Builtins),
-            Repeatable = Name#resource_name.prefix =:= Config#eflyway_config.repeatable_prefix,
+            Repeatable = Name#resource_name.version =:= undefined,
             {Checksum, Equivalent} = checksums(Resource, Config, Builtins1, Repeatable),
             Script = eflyway_sql_script:parse(Resource, Config, Dialect, Builtins1),
             {true, #resolved{

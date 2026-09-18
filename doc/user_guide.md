@@ -163,11 +163,11 @@ eflyway \
 V<版本>__<描述>.sql
 ```
 
-- 前缀：`V`（可配置 `sqlMigrationPrefix`）
-- 分隔符：`__`（两个下划线，可配置 `sqlMigrationSeparator`）
+- 前缀：`V`
+- 分隔符：`__`（两个下划线）
 - 版本：数字，用 `.` 或 `_` 分隔，逐段数值比较
 - 描述：可含下划线，展示时会替换为空格
-- 后缀：`.sql`（可配置 `sqlMigrationSuffixes`）
+- 后缀：`.sql`
 
 示例：
 
@@ -188,7 +188,7 @@ V<版本>__<描述>.sql
 R__<描述>.sql
 ```
 
-- 前缀：`R`（可配置 `repeatableSqlMigrationPrefix`）
+- 前缀：`R`
 - 没有版本号
 - **每次校验和变化都会重新执行**，适合视图、存储过程、函数等。
 
@@ -524,10 +524,6 @@ eflyway migrate
 | `flyway.placeholderSuffix` | `}` | 占位符后缀 |
 | `flyway.placeholders.<key>` | — | 自定义占位符 |
 | `flyway.encoding` | `UTF-8` | 编码 |
-| `flyway.sqlMigrationPrefix` | `V` | 版本化前缀 |
-| `flyway.repeatableSqlMigrationPrefix` | `R` | 可重复前缀 |
-| `flyway.sqlMigrationSeparator` | `__` | 分隔符 |
-| `flyway.sqlMigrationSuffixes` | `.sql` | 后缀 |
 | `flyway.mixed` | `false` | 混合事务语句 |
 | `flyway.installedBy` | — | 安装者 |
 | `flyway.connectRetries` | `0` | 连接重试 |

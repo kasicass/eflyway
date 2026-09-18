@@ -1,32 +1,30 @@
 %% @doc Migration file name parser.
+%%
+%% The naming convention is fixed (not configurable):
+%%   V<version>__<description>.sql   versioned migration
+%%   R__<description>.sql            repeatable migration
 -module(eflyway_resource_name).
 
 -include("eflyway.hrl").
 
--export([parse/2, parse/3, is_valid/1]).
+-export([parse/1, is_valid/1]).
 
--spec parse(binary(), #eflyway_config{}) -> #resource_name{}.
-parse(Filename, Config) ->
-    parse(Filename, Config, Config#eflyway_config.suffixes).
-
--spec parse(binary(), #eflyway_config{}, [binary()]) -> #resource_name{}.
-parse(Filename, Config, Suffixes) ->
-    {NameWithoutSuffix, Suffix} = strip_suffix(Filename, Suffixes),
-    Separator = Config#eflyway_config.separator,
-    Prefixes = prefixes(Config),
-    case find_prefix(NameWithoutSuffix, Prefixes) of
+-spec parse(binary()) -> #resource_name{}.
+parse(Filename) ->
+    {NameWithoutSuffix, Suffix} = strip_suffix(Filename),
+    case find_prefix(NameWithoutSuffix, prefixes()) of
         none ->
             invalid(Filename, <<"Unrecognised migration name format: ", Filename/binary>>);
         {Prefix, ResourceType} ->
             Name = binary:part(NameWithoutSuffix, byte_size(Prefix),
                                byte_size(NameWithoutSuffix) - byte_size(Prefix)),
-            {Left, Right} = split_at_separator(Name, Separator),
-            {Valid, Message, Version} = validate(ResourceType, Prefix, Separator, Filename, Left, Right, Suffix),
+            {Left, Right} = split_at_separator(Name, ?MIGRATION_SEPARATOR),
+            {Valid, Message, Version} = validate(ResourceType, Filename, Left),
             #resource_name{
                 valid = Valid,
                 prefix = Prefix,
                 version = Version,
-                separator = Separator,
+                separator = ?MIGRATION_SEPARATOR,
                 description = binary:replace(Right, <<"_">>, <<" ">>, [global]),
                 raw_description = Right,
                 suffix = Suffix,
@@ -40,13 +38,12 @@ is_valid(#resource_name{valid = V}) -> V.
 
 %% internal
 
-prefixes(#eflyway_config{} = Config) ->
-    P = [{Config#eflyway_config.sql_migration_prefix, versioned},
-         {Config#eflyway_config.repeatable_prefix, repeatable}],
-    lists:sort(fun({A, _}, {B, _}) -> byte_size(A) >= byte_size(B) end, P).
+prefixes() ->
+    [{?SQL_MIGRATION_PREFIX, versioned},
+     {?REPEATABLE_PREFIX, repeatable}].
 
-strip_suffix(Filename, Suffixes) ->
-    strip_suffix(Filename, Suffixes, Filename).
+strip_suffix(Filename) ->
+    strip_suffix(Filename, ?MIGRATION_SUFFIXES, Filename).
 
 strip_suffix(_Filename, [], Original) -> {Original, <<>>};
 strip_suffix(Filename, [Suffix | Rest], Original) ->
@@ -75,14 +72,14 @@ split_at_separator(Name, Separator) ->
             {Name, <<>>}
     end.
 
-validate(repeatable, _, _Separator, Filename, Left, _Right, _Suffix) ->
+validate(repeatable, Filename, Left) ->
     case Left of
         <<>> -> {true, <<>>, undefined};
         _ ->
             {false, <<"Invalid repeatable migration name format: ", Filename/binary,
                       " (It cannot contain a version.)">>, undefined}
     end;
-validate(versioned, _Prefix, _Separator, Filename, Left, _Right, _Suffix) ->
+validate(versioned, Filename, Left) ->
     case Left of
         <<>> ->
             {false, <<"Invalid versioned migration name format: ", Filename/binary,

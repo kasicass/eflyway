@@ -6,9 +6,9 @@
 -export([scan/1, scan_location/1]).
 
 -spec scan(#eflyway_config{}) -> [#resource{}].
-scan(#eflyway_config{locations = Locations, suffixes = Suffixes}) ->
+scan(#eflyway_config{locations = Locations}) ->
     All = lists:flatmap(fun(Location) -> scan_location(Location) end, Locations),
-    Filtered = [R || R <- All, has_suffix(R#resource.filename, Suffixes)],
+    Filtered = [R || R <- All, has_suffix(R#resource.filename, ?MIGRATION_SUFFIXES)],
     dedup(Filtered).
 
 -spec scan_location(binary()) -> [#resource{}].

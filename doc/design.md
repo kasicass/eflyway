@@ -169,10 +169,6 @@ eflyway/
 | `schemas` | 空 | 受管 schema（MySQL 用 database 名；SQLite 用 `main`） |
 | `defaultSchema` | 空 | 默认 schema，缺省取 `schemas` 第一个或连接当前 schema |
 | `encoding` | `UTF-8` | 脚本编码 |
-| `sqlMigrationPrefix` | `V` | 版本化迁移前缀 |
-| `repeatableSqlMigrationPrefix` | `R` | 可重复迁移前缀 |
-| `sqlMigrationSeparator` | `__` | 前缀与描述之间的分隔符 |
-| `sqlMigrationSuffixes` | `.sql` | 后缀，逗号分隔 |
 | `placeholderReplacement` | `true` | 是否替换占位符 |
 | `placeholderPrefix` | `${` | 占位符前缀 |
 | `placeholderSuffix` | `}` | 占位符后缀 |
@@ -213,10 +209,6 @@ eflyway/
     schemas              :: [binary()],
     default_schema       :: binary() | undefined,
     encoding             :: atom(),                 %% utf8 | latin1
-    sql_migration_prefix :: binary(),
-    repeatable_prefix    :: binary(),
-    separator            :: binary(),
-    suffixes             :: [binary()],
     placeholder_replacement :: boolean(),
     placeholder_prefix   :: binary(),
     placeholder_suffix   :: binary(),
@@ -371,15 +363,15 @@ CREATE INDEX "main"."flyway_schema_history_s_idx" ON "flyway_schema_history" ("s
 
 - `locations` 仅支持 `filesystem:<dir>`（以及裸路径，视为 filesystem）。
 - 递归扫描目录，返回 `#resource{path, relative_path, filename}` 列表。
-- 只保留后缀匹配 `suffixes` 的文件。
+- 只保留后缀匹配 `.sql` 的文件。
 
 ### 6.2 文件名解析（`eflyway_resource_name`）
 
 文件名解析算法：
 
 1. 从右去掉后缀，得到 `name_without_suffix` 与 `suffix`。
-2. 在前缀集合（按长度降序）中找第一个匹配的前缀：`V`（versioned）、`R`（repeatable）。
-3. 去掉前缀后，按 `separator`（默认 `__`）切分：
+2. 按固定前缀匹配：`V`（versioned）、`R`（repeatable）。
+3. 去掉前缀后，按 `__` 切分：
    - versioned：分隔符左边必须是合法版本号，右边是描述；
    - repeatable：分隔符左边必须为空，分隔符及右边是描述。
 4. 描述中的 `_` 替换为空格。
