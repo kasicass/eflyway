@@ -7,6 +7,7 @@
 
 -spec migrate(term(), #eflyway_config{}, [#resolved{}]) -> map().
 migrate(Conn, Config, Resolved) ->
+    maybe_validate_on_migrate(Conn, Config, Resolved),
     ensure_history(Conn, Config),
     Total = migrate_all(Conn, Config, Resolved, 0),
     case Total of
@@ -178,3 +179,28 @@ migration_text(Conn, Config, R) ->
 
 schema_name(Conn, Config) ->
     eflyway_db:schema_name(Conn, Config).
+
+%% Validate before migrating when validateOnMigrate is enabled.
+%% Mirrors Flyway: pending and outdated migrations are not validation errors.
+maybe_validate_on_migrate(Conn, Config, Resolved) ->
+    case Config#eflyway_config.validate_on_migrate of
+        false -> ok;
+        true ->
+            Result = eflyway_cmd_validate:validate(Conn, Config, Resolved, #{pending => true}),
+            case maps:get(validation_successful, Result) of
+                true -> ok;
+                false ->
+                    case Config#eflyway_config.clean_on_validation_error of
+                        true ->
+                            _ = eflyway_cmd_clean:clean(Conn, Config),
+                            ok;
+                        false ->
+                            eflyway_error:raise(validate_error,
+                                format_errors(maps:get(errors, Result)))
+                    end
+            end
+    end.
+
+format_errors(Errors) ->
+    iolist_to_binary(lists:join(<<"\n">>,
+        [io_lib:format("~s: ~s", [Code, Msg]) || {Code, Msg} <- Errors])).

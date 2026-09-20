@@ -413,7 +413,7 @@ missing_error(_Info, _State, _Ctx) ->
 
 ignored_pending_error(Info, ignored, Ctx) ->
     case Ctx#mi_context.ignored of
-        true -> ok;
+        true -> false;
         false ->
             R = Info#migration_info.resolved,
             case R#resolved.version of
@@ -427,7 +427,7 @@ ignored_pending_error(Info, ignored, Ctx) ->
     end;
 ignored_pending_error(Info, pending, Ctx) ->
     case Ctx#mi_context.pending of
-        true -> ok;
+        true -> false;
         false ->
             R = Info#migration_info.resolved,
             case R#resolved.version of
@@ -441,7 +441,7 @@ ignored_pending_error(Info, pending, Ctx) ->
     end;
 ignored_pending_error(Info, outdated, Ctx) ->
     case Ctx#mi_context.pending of
-        true -> ok;
+        true -> false;
         false ->
             R = Info#migration_info.resolved,
             {true, {outdated_repeatable_migration,
@@ -452,9 +452,9 @@ ignored_pending_error(Info, _State, _Ctx) ->
     mismatch_error(Info).
 
 mismatch_error(#migration_info{resolved = R, applied = A}) when R =/= undefined, A =/= undefined ->
-    case A#applied.type of
-        delete -> false;
-        _ ->
+    case eflyway_migration_type:is_synthetic(A#applied.type) of
+        true -> false;
+        false ->
             case R#resolved.type =/= A#applied.type of
                 true -> {true, {type_mismatch, type_mismatch_message(A, R)}};
                 false ->

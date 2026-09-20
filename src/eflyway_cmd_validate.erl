@@ -3,14 +3,24 @@
 
 -include("eflyway.hrl").
 
--export([validate/3]).
+-export([validate/3, validate/4]).
 
 -spec validate(term(), #eflyway_config{}, [#resolved{}]) -> map().
 validate(Conn, Config, Resolved) ->
+    validate(Conn, Config, Resolved, #{}).
+
+%% @doc Validate with extra opts overrides.
+%%
+%% Used by migrate's pre-validation, which forces `pending => true` so that
+%% migrations which are merely not applied yet (and outdated repeatable
+%% migrations) do not count as validation errors.
+-spec validate(term(), #eflyway_config{}, [#resolved{}], map()) -> map().
+validate(Conn, Config, Resolved, Overrides) ->
+    Opts = maps:merge(opts(Config), Overrides),
     Schema = eflyway_db:schema_name(Conn, Config),
     case eflyway_db:schema_exists(Conn, Schema) of
         false ->
-            case Resolved =/= [] andalso not Config#eflyway_config.ignore_pending_migrations of
+            case Resolved =/= [] andalso not maps:get(pending, Opts) of
                 true ->
                     #{validation_successful => false, count => 0,
                       errors => [{schema_does_not_exist,
@@ -20,7 +30,7 @@ validate(Conn, Config, Resolved) ->
             end;
         true ->
             Applied = eflyway_schema_history:all_applied(Conn, Config),
-            Infos = eflyway_info_service:refresh(Resolved, Applied, opts(Config)),
+            Infos = eflyway_info_service:refresh(Resolved, Applied, Opts),
             Errors = eflyway_info_service:validate(Infos),
             Successful = Errors =:= [],
             case Successful of

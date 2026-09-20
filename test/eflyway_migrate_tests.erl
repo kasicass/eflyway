@@ -42,6 +42,21 @@ ensure_history_on_first_migrate_test() ->
         ?assert(history_exists(Config))
     end).
 
+%% validateOnMigrate=true (default) aborts migrate when an applied migration
+%% was modified; disabling it lets migrate proceed.
+validate_on_migrate_test() ->
+    with_env(fun(Dir, Db) ->
+        write(Dir, "V1__init.sql", <<"CREATE TABLE a (id INTEGER);">>),
+        Config = config(Dir, Db),
+        eflyway_flyway:migrate(Config),
+        write(Dir, "V1__init.sql", <<"CREATE TABLE a (id INTEGER, b TEXT);">>),
+        ?assertError({eflyway_error, validate_error, _, _},
+                     eflyway_flyway:migrate(Config)),
+        ConfigNoValidate = Config#eflyway_config{validate_on_migrate = false},
+        Result = eflyway_flyway:migrate(ConfigNoValidate),
+        ?assertEqual(0, maps:get(migrations_executed, Result))
+    end).
+
 %% helpers
 
 config(Dir, Db) ->
