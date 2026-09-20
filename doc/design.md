@@ -11,7 +11,7 @@
 数据库版本迁移工具的核心思想是：
 
 - 用文件名约定版本（`V1__init.sql`、`R__view.sql`）。
-- 用一张 **schema history 表** 记录已应用的迁移及其校验和。
+- 用一张 **schema history table** 记录已应用的迁移及其校验和。
 - 通过 `migrate / validate / info / baseline / clean / repair` 等命令管理迁移生命周期。
 - 保证「同一份迁移脚本在不同环境可重复执行且结果一致」。
 
@@ -20,7 +20,7 @@
 1. **行为一致**：对 SQL 迁移（versioned / repeatable），在 MySQL 与 SQLite3 上提供以下能力：
    - 文件名解析、版本比较、校验和计算；
    - SQL 语句解析（分隔符、注释、字符串、块结构）；
-   - schema history 表的读写；
+   - schema history table 的读写；
    - 迁移状态机（Pending / Success / Missing / Ignored / Future / Failed / Baseline / Outdated / Superseded …）；
    - `migrate / validate / info / baseline / clean / repair` 命令。
 2. **单一可执行入口**：打包成 escript `eflyway`，以命令行形式使用。
@@ -37,7 +37,6 @@
 | Callback（`beforeMigrate` 等） | 首期不实现，预留 hook 点 |
 | `undo` | 回退迁移，未实现 |
 | `cherryPick`、`skipExecutingMigrations`、`dryRunOutput`、`errorOverrides`、`stream`、`batch` | 未实现 |
-| `group`、mixed 多语句复杂事务 | 首期可简化，见 §13 |
 | Oracle / PostgreSQL / SQL Server 等 | 仅 MySQL、SQLite3 |
 | JAR/classpath/云端（S3/GCS）资源 | 仅本地文件系统资源 |
 | Maven / Gradle 插件 | Java 专属的构建集成，不做；只提供独立的 escript CLI |
@@ -81,7 +80,7 @@
 4. **迁移服务层**：
    - `eflyway_resolver`：扫描资源、解析文件名、计算校验和；
    - `eflyway_parser*`：把 SQL 文件切成语句流；
-   - `eflyway_schema_history`：schema history 表的 CRUD；
+   - `eflyway_schema_history`：schema history table 的 CRUD；
    - `eflyway_info_service`：融合「已解析」与「已应用」，得到每个迁移的状态。
 5. **数据库适配层**（`eflyway_db`, `eflyway_db_mysql`, `eflyway_db_sqlite`）：连接、执行、事务、锁、DDL、clean。
 
@@ -116,7 +115,7 @@ eflyway/
 │   ├── eflyway_parser_mysql.erl
 │   ├── eflyway_parser_sqlite.erl
 │   ├── eflyway_sql_script.erl      %% 语句流、executeInTransaction
-│   ├── eflyway_schema_history.erl  %% schema history 表操作
+│   ├── eflyway_schema_history.erl  %% schema history table 操作
 │   ├── eflyway_info_service.erl    %% refresh/state/validate/pending/failed...
 │   ├── eflyway_cmd_migrate.erl
 │   ├── eflyway_cmd_validate.erl
@@ -164,7 +163,7 @@ eflyway/
 | `user` | — | 数据库用户 |
 | `password` | — | 数据库密码 |
 | `locations` | `filesystem:sql`（本设计使用本地目录 `sql`，等价 `db/migration`） | 迁移脚本目录，逗号分隔；支持 `filesystem:` 前缀 |
-| `table` | `flyway_schema_history` | schema history 表名 |
+| `table` | `flyway_schema_history` | schema history table 名 |
 | `schemas` | 空 | 受管 schema（MySQL 用 database 名；SQLite 用 `main`） |
 | `defaultSchema` | 空 | 默认 schema，缺省取 `schemas` 第一个或连接当前 schema |
 | `encoding` | `UTF-8` | 脚本编码 |
@@ -186,11 +185,11 @@ eflyway/
 | `cleanOnValidationError` | `false` | validate 失败自动 clean |
 | `cleanDisabled` | `false` | 禁用 clean |
 | `createSchemas` | `true` | 自动创建 schema |
-| `mixed` | `false` | 允许同一迁移混合事务/非事务语句 |
-| `group` | `false` | 是否成组迁移（首期仅支持 false 的语义，见 §13） |
+| `mixed` | `false` | 允许一个迁移组混合事务/非事务迁移 |
+| `group` | `false` | 把一次 migrate 的所有 pending 迁移放进同一个事务 |
 | `installedBy` | 空 | 写入 `installed_by`，缺省取数据库当前用户 |
 | `connectRetries` | `0` | 连接重试次数 |
-| `lockRetryCount` | `50` | 获取锁重试次数 |
+| `lockRetryCount` | `50` | 获取锁失败时的重试次数（`-1` 无限重试） |
 | `configFiles` | — | 显式配置文件列表，逗号分隔（覆盖默认配置文件） |
 | `configFileEncoding` | `UTF-8` | 配置文件编码 |
 
@@ -249,7 +248,7 @@ eflyway/
 | SQLite3 | `sqlite3:///abs/path/app.db` |
 | SQLite3（相对路径） | `sqlite3:./data/app.db` 或 `sqlite3://data/app.db` |
 
-> SQLite 仅支持**文件库**；不支持 `:memory:` 内存库（生命周期等于连接、无法持久化历史表，对迁移工具无意义）。
+> SQLite 仅支持**文件库**；不支持 `:memory:` 内存库（生命周期等于连接、无法持久化 schema history table，对迁移工具无意义）。
 
 解析规则（`eflyway_url:parse/1`）：
 
@@ -296,8 +295,8 @@ eflyway/
 - 布尔真/假：`1` / `0`。
 - `supports_ddl_transactions() -> false`（DDL 隐式提交，失败无法回滚）。
 - 锁：使用 MySQL 命名锁 `GET_LOCK('eflyway-<hash>', 10)` / `RELEASE_LOCK(...)`。
-  - 锁名 discriminator 取 schema history 表全名（含 schema）字符串的 hash。
-- 历史表 DDL：
+  - 锁名 discriminator 取 schema history table 全名（含 schema）字符串的 hash。
+- schema history table DDL：
 
 ```sql
 CREATE TABLE `flyway_schema_history` (
@@ -327,7 +326,7 @@ CREATE INDEX `flyway_schema_history_s_idx` ON `flyway_schema_history` (`success`
 - 布尔真/假：`1` / `0`。
 - `supports_ddl_transactions() -> true`（SQLite 的 DDL 在事务内可回滚）。
 - 锁：SQLite 不支持表级命名锁，`lock/3` 退化为直接执行；并发写由 SQLite 文件锁与 `BEGIN IMMEDIATE` 保障。
-- 历史表 DDL：
+- schema history table DDL：
 
 ```sql
 CREATE TABLE "flyway_schema_history" (
@@ -515,7 +514,7 @@ get_next_statement(Reader, Ctx):
 - 默认 `true`。
 - **SQLite**：`PRAGMA FOREIGN_KEYS` 判定为非事务语句。
 - MySQL：默认 `true`（MySQL 的 DDL 语义另由 `supports_ddl_transactions=false` 处理）。
-- 迁移级：只有全部语句都可事务执行，整段迁移才在事务中执行；否则按非事务处理（`mixed=false` 时若同一迁移混用两种语句则报错）。
+- 迁移级：只有全部语句都可事务执行，整段迁移才在事务中执行；否则按非事务处理。
 
 ### 7.7 占位符替换（`eflyway_placeholder`）
 
@@ -528,7 +527,7 @@ get_next_statement(Reader, Ctx):
 
 ---
 
-## 8. Schema History 表
+## 8. Schema History Table
 
 ### 8.1 列定义
 
@@ -549,7 +548,7 @@ get_next_statement(Reader, Ctx):
 
 - `exists/1`：查询元数据/`sqlite_master` 判断表是否存在。
 - `create/3`：创建表；`baseline=true` 时附带插入 baseline 行（MySQL 用 `CREATE TABLE ... AS SELECT`，SQLite 用 `CREATE TABLE` + `INSERT`）。
-- `all_applied/1`：先判断表是否存在；不存在时返回空列表，否则 `SELECT ... FROM <table> WHERE installed_rank > ? ORDER BY installed_rank`。因此 **`info` / `validate` / `repair` 不会创建历史表**，只有 `migrate`（空 schema 路径）与 `baseline` 会创建。
+- `all_applied/1`：先判断表是否存在；不存在时返回空列表，否则 `SELECT ... FROM <table> WHERE installed_rank > ? ORDER BY installed_rank`。因此 **`info` / `validate` / `repair` 不会创建 schema history table**，只有 `migrate`（空 schema 路径）与 `baseline` 会创建。
 - `add_applied/...`：计算 `installed_rank = max+1`（SCHEMA 固定 0），插入一行。
 - `lock/3`：MySQL 命名锁；SQLite 直通。
 - `update/2`：repair 时按 `installed_rank` 更新 description/type/checksum。
@@ -690,9 +689,9 @@ migrate 流程：
 
 ```
 1. 若 validateOnMigrate = true:
-       先 doValidate(..., pending=true)
+       先 validate（pending=true、忽略 outdated）
        失败且 cleanOnValidationError=false -> 抛出校验错误
-       失败且 cleanOnValidationError=true -> doClean
+       失败且 cleanOnValidationError=true -> doClean，然后继续
 2. 若 schema history 不存在:
        若非空 schema:
            baselineOnMigrate=true -> doBaseline
@@ -700,34 +699,31 @@ migrate 流程：
        否则:
            createSchemas=true -> 创建 schema
            schema_history:create(baseline=false)
-3. 循环 migrateAll:
-       loop:
-           count = schema_history:lock(fun() -> migrateGroup(firstRun) end)
-           total += count
-           if count == 0 -> break
-4. migrateGroup:
+3. migrateAll:
+       group=false（默认）:
+           循环: lock(fun() -> migrateGroup() end)，每次应用 1 条，直到 0
+       group=true:
+           lock(fun() -> migrateGroupAll() end) 一次，应用全部 pending
+       （MySQL 锁为 GET_LOCK(name,1)，拿不到按 lockRetryCount 每 1s 重试）
+4. migrateGroup / migrateGroupAll:
        info_service:refresh()
-       current = info_service:current()
-       打印当前版本 / 警告（outOfOrder、future）
+       打印当前版本
        若存在 failed 迁移 -> 报错
-       选择 pending 迁移:
-           默认每次只取 1 条（group=false）
-           pending 组按顺序
-       applyMigrations(group)
-5. applyMigrations:
-       判断组内是否在事务中执行
+       取 pending 迁移（group=false 只取 1 条；group=true 取全部）
+       applyGroup
+5. applyGroup:
+       计算组内每条迁移是否可事务执行（supports_ddl_transactions 且脚本可事务）
+       group=true 且组内混用、mixed=false -> 报 mixed_migrations
+       整组可事务 -> 一个事务包裹全部；否则整组按非事务执行
        执行每条:
-           restore_original_state / change_current_schema
-           before each hook
            执行迁移的 SQL 语句流
-           after each hook
            记录 execution_time
            schema_history:add_applied(... success=true)
        失败:
-           若是 DDL 事务库且组事务 -> 回滚
-           否则 -> 记录一条 success=false 的 applied
+           组事务 -> 整组回滚，不写历史
+           非事务 -> 为失败那条记录 success=false
            抛出异常
-6. logSummary：打印成功条数与耗时。
+6. logSummary：打印成功条数。
 ```
 
 ### 10.2 `validate`
@@ -738,7 +734,7 @@ migrate 流程：
 1. schema 不存在:
        若存在本地迁移且 pending=false -> SCHEMA_DOES_NOT_EXIST 错误
        否则 -> 成功（0 条）
-2. info_service(refresh)   （历史表不存在时 all_applied 返回空）
+2. info_service(refresh)   （schema history table 不存在时 all_applied 返回空）
 3. info_service:validate() -> 错误列表
 4. 空 -> 成功；否则 -> 失败（cleanOnValidationError 时触发 clean）
 ```
@@ -755,7 +751,7 @@ info 输出：
 
 ### 10.4 `baseline`
 
-基线流程：
+baseline 流程：
 
 ```
 1. schema history 不存在 -> create(baseline=true)，成功。
@@ -774,7 +770,7 @@ info 输出：
 
 ```
 1. cleanDisabled=true -> 报错
-2. 判断历史表是否有 SCHEMA 标记（决定 drop schema 还是 clean schema）
+2. 判断 schema history table 是否有 SCHEMA 标记（决定 drop schema 还是 clean schema）
 3. cleanPreSchemas
 4. 对每个 schema:
        schema 不存在 -> warn 跳过
@@ -804,29 +800,29 @@ info 输出：
 
 | 数据库 | 表锁 | 说明 |
 |--------|------|------|
-| MySQL | `GET_LOCK('eflyway-<discriminator>', 10)` + `RELEASE_LOCK` | 命名锁，discriminator 为历史表限定名的 hash |
-| SQLite | 无显式锁 | 依赖 `BEGIN IMMEDIATE` 与文件锁；`lock/3` 直接执行 |
+| MySQL | `GET_LOCK('eflyway-<discriminator>', 1)` + `RELEASE_LOCK` | 命名锁，discriminator 为 schema history table 限定名的 hash；拿不到锁时按 `lockRetryCount` 每 1 秒重试（默认 50 次，`-1` 无限） |
+| SQLite | 无显式锁 | 依赖 `BEGIN IMMEDIATE` 与文件锁；`lock/4` 直接执行 |
 
-`lock/3` 的语义：进入时获取，回调结束后释放；`migrateAll` 中每条迁移获取一次锁，`group=false` 时逐条加锁。
+`lock/4` 的语义：进入时获取，回调结束后释放；`group=false` 时每条迁移获取一次锁，`group=true` 时整个组只获取一次。
 
 ---
 
 ## 12. 事务语义
 
 - **MySQL**：`supports_ddl_transactions = false`。DDL 会隐式提交，迁移失败**不会**回滚，需要人工清理，并由 `repair` 删除失败记录。
-- **SQLite**：`supports_ddl_transactions = true`。整个迁移可包在事务里，失败自动回滚（包括历史表写入）。
+- **SQLite**：`supports_ddl_transactions = true`。整个迁移可包在事务里，失败自动回滚（包括 schema history table 写入）。
 - 判断某条迁移是否可事务执行：见 §7.6。若可，则 `transaction/2` 包裹整条迁移；否则直接执行。
-- `mixed=true` 时允许同一迁移混用事务/非事务语句；`mixed=false` 时报错。
+- `group=true` 时，若组内混用可事务与不可事务的迁移：`mixed=true` 允许（整组按非事务执行），`mixed=false` 报错。
 
 ---
 
 ## 13. 差异与简化说明
 
-1. `group` 配置保留，但首期等价于单条迁移处理（`group=false` 语义）；成组事务可作为后续增强。
+1. `group` 与 `mixed` 已实现：`group=true` 时一次 migrate 的 pending 迁移作为一个组，单锁 + 整组事务；组内混用在 `mixed=false` 时报错。
 2. 不实现 callbacks，但 `eflyway_flyway` 中预留 `before/after` hook 调用点，便于后续扩展。
 3. 不实现 Java migration、undo、cherryPick、dryRun、errorOverrides、stream、batch。
 4. 资源只支持本地文件系统。
-5. 迁移脚本 `.conf` 元数据（`executeInTransaction` / `encoding` / `shouldExecute`）可作为增强项，首期默认全部执行且编码固定 UTF-8。
+5. 迁移脚本 `.conf` 元数据（`executeInTransaction` / `encoding` / `shouldExecute`）可作为增强项；目前 `encoding` 由全局配置项控制，默认 UTF-8。
 
 ---
 
@@ -852,7 +848,7 @@ info 输出：
 | `checksum_mismatch` / `type_mismatch` / `description_mismatch` | 不一致 |
 | `outdated_repeatable_migration` | 可重复迁移过期 |
 | `validate_error` | 校验失败汇总 |
-| `non_empty_schema_no_history` | 非空库无历史表且未开启 baselineOnMigrate |
+| `non_empty_schema_no_history` | 非空库无 schema history table 且未开启 baselineOnMigrate |
 | `clean_disabled` | clean 被禁用 |
 
 ---
@@ -890,7 +886,7 @@ info 输出：
 
 ## 17. 关键结论
 
-- 迁移工具的本质是「**文件约定 + 历史表 + 状态机**」，其复杂度集中在 **SQL 解析** 与 **状态判定** 两处，设计上应把它们做成无副作用的纯函数模块，便于测试。
+- 迁移工具的本质是「**文件约定 + schema history table + 状态机**」，其复杂度集中在 **SQL 解析** 与 **状态判定** 两处，设计上应把它们做成无副作用的纯函数模块，便于测试。
 - MySQL 与 SQLite 的差异被收敛到 `eflyway_db` behaviour，尤其是 DDL 事务、表锁、schema 语义、clean 策略四点。
 - 首期以核心迁移能力为目标，企业版与 JVM 相关能力明确排除。
 - escript + `mysql-otp` / `esqlite` 的组合无需引入 JVM，单文件即可运行。
