@@ -16,7 +16,7 @@ baseline(Conn, Config) ->
               baseline_version => eflyway_migration_version:display(Version)};
         true ->
             case eflyway_schema_history:baseline_marker(Conn, Config) of
-                undefined -> existing_history(Conn, Config, Version);
+                undefined -> existing_history(Conn, Config);
                 Marker ->
                     MarkerVersion = Marker#applied.version,
                     SameVersion = MarkerVersion =/= undefined
@@ -46,32 +46,23 @@ do_create(Conn, Config, Version) ->
     eflyway_log:info("Successfully baselined schema with version: ~s",
                      [eflyway_migration_version:display(Version)]).
 
-existing_history(Conn, Config, Version) ->
+existing_history(Conn, Config) ->
     Table = eflyway_schema_history:table_name(Config),
-    Zero = eflyway_migration_version:compare(Version,
-               eflyway_migration_version:from_version(<<"0">>)) =:= eq,
-    case eflyway_schema_history:has_schemas_marker(Conn, Config) andalso Zero of
+    case eflyway_schema_history:has_non_synthetic(Conn, Config) of
         true ->
             eflyway_error:raise(baseline_failed,
                 ["Unable to baseline schema history table ", Table,
-                 " with version 0 as this version was used for schema creation"]);
+                 " as it already contains migrations"]);
         false ->
-            case eflyway_schema_history:has_non_synthetic(Conn, Config) of
-                true ->
+            case eflyway_schema_history:all_applied(Conn, Config) of
+                [] ->
                     eflyway_error:raise(baseline_failed,
                         ["Unable to baseline schema history table ", Table,
-                         " as it already contains migrations"]);
-                false ->
-                    case eflyway_schema_history:all_applied(Conn, Config) of
-                        [] ->
-                            eflyway_error:raise(baseline_failed,
-                                ["Unable to baseline schema history table ", Table,
-                                 " as it already exists, and is empty. Delete the schema history table with clean, and run baseline again."]);
-                        _ ->
-                            eflyway_error:raise(baseline_failed,
-                                ["Unable to baseline schema history table ", Table,
-                                 " as it already contains migrations. Delete the schema history table with clean, and run baseline again."])
-                    end
+                         " as it already exists, and is empty. Delete the schema history table with clean, and run baseline again."]);
+                _ ->
+                    eflyway_error:raise(baseline_failed,
+                        ["Unable to baseline schema history table ", Table,
+                         " as it already contains migrations. Delete the schema history table with clean, and run baseline again."])
             end
     end.
 

@@ -16,7 +16,7 @@
          dialect/1,
          table_exists/2, all_tables/2,
          schema_exists/2, schema_empty/2,
-         create_schema/2, drop_schema/2, clean_schema/2]).
+         clean_schema/2]).
 
 %% ---------------------------------------------------------------------
 %% Behaviour
@@ -43,8 +43,6 @@
 -callback all_tables(Conn :: term(), Schema :: binary()) -> [binary()].
 -callback schema_exists(Conn :: term(), Schema :: binary()) -> boolean().
 -callback schema_empty(Conn :: term(), Schema :: binary()) -> boolean().
--callback create_schema(Conn :: term(), Schema :: binary()) -> ok.
--callback drop_schema(Conn :: term(), Schema :: binary()) -> ok.
 -callback clean_schema(Conn :: term(), Schema :: binary()) -> ok.
 
 %% ---------------------------------------------------------------------
@@ -109,8 +107,6 @@ all_tables(#conn{adapter = Mod, handle = H}, Schema) -> Mod:all_tables(H, Schema
 
 schema_exists(#conn{adapter = Mod, handle = H}, Schema) -> Mod:schema_exists(H, Schema).
 schema_empty(#conn{adapter = Mod, handle = H}, Schema) -> Mod:schema_empty(H, Schema).
-create_schema(#conn{adapter = Mod, handle = H}, Schema) -> Mod:create_schema(H, Schema).
-drop_schema(#conn{adapter = Mod, handle = H}, Schema) -> Mod:drop_schema(H, Schema).
 clean_schema(#conn{adapter = Mod, handle = H}, Schema) -> Mod:clean_schema(H, Schema).
 
 adapter(mysql) -> eflyway_db_mysql;

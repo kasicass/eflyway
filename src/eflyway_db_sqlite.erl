@@ -15,7 +15,7 @@
          server_info/1,
          table_exists/2, all_tables/2,
          schema_exists/2, schema_empty/2,
-         create_schema/2, drop_schema/2, clean_schema/2]).
+         clean_schema/2]).
 
 -define(SYSTEM_TABLES, [<<"sqlite_sequence">>, <<"android_metadata">>]).
 
@@ -208,14 +208,6 @@ schema_exists(_Db, _Schema) ->
 schema_empty(Db, Schema) ->
     Tables = all_tables(Db, Schema),
     [T || T <- Tables, not lists:member(T, ?SYSTEM_TABLES)] =:= [].
-
-create_schema(_Db, Schema) ->
-    eflyway_log:info("SQLite does not support creating schemas. Schema not created: ~s", [Schema]),
-    ok.
-
-drop_schema(_Db, Schema) ->
-    eflyway_log:info("SQLite does not support dropping schemas. Schema not dropped: ~s", [Schema]),
-    ok.
 
 clean_schema(Db, Schema) ->
     SchemaQ = quote(Schema),

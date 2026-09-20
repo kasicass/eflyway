@@ -4,9 +4,9 @@
 -include("eflyway.hrl").
 
 -export([exists/2, create/3, all_applied/2, add_applied/9,
-         add_schemas_marker/3, lock/3, next_rank/2, table_name/1,
+         lock/3, next_rank/2, table_name/1,
          remove_failed/2, update_applied/4, delete_applied/3,
-         baseline_marker/2, has_schemas_marker/2, has_non_synthetic/2]).
+         baseline_marker/2, has_non_synthetic/2]).
 
 -spec exists(term(), #eflyway_config{}) -> boolean().
 exists(Conn, #eflyway_config{table = Table}) ->
@@ -73,12 +73,6 @@ add_applied(Conn, #eflyway_config{table = Table} = Config, Version, Description,
         {error, Reason} ->
             eflyway_error:raise(schema_history_write_failed, [Table], #{reason => Reason})
     end.
-
--spec add_schemas_marker(term(), #eflyway_config{}, [binary()]) -> ok.
-add_schemas_marker(Conn, Config, Schemas) ->
-    Script = join(Schemas, <<",">>),
-    add_applied(Conn, Config, undefined, <<"<< Schema Creation >>">>,
-                schema, Script, undefined, 0, true).
 
 -spec lock(term(), #eflyway_config{}, fun(() -> R)) -> R.
 lock(Conn, #eflyway_config{table = Table, lock_retry_count = Retries}, Fun) ->
@@ -151,13 +145,6 @@ baseline_marker(Conn, Config) ->
     case [A || A <- Candidates, A#applied.type =:= baseline] of
         [Marker | _] -> Marker;
         [] -> undefined
-    end.
-
--spec has_schemas_marker(term(), #eflyway_config{}) -> boolean().
-has_schemas_marker(Conn, Config) ->
-    case all_applied(Conn, Config) of
-        [#applied{type = schema} | _] -> true;
-        _ -> false
     end.
 
 -spec has_non_synthetic(term(), #eflyway_config{}) -> boolean().

@@ -15,7 +15,7 @@
          server_info/1,
          table_exists/2, all_tables/2,
          schema_exists/2, schema_empty/2,
-         create_schema/2, drop_schema/2, clean_schema/2]).
+         clean_schema/2]).
 
 %% ---------------------------------------------------------------------
 %% Connection
@@ -273,12 +273,6 @@ schema_empty(Conn, Schema) ->
         {ok, [#{<<"cnt">> := N}]} -> N =:= 0;
         _ -> true
     end.
-
-create_schema(Conn, Schema) ->
-    expect_ok(Conn, iolist_to_binary(["CREATE SCHEMA ", quote(Schema)])).
-
-drop_schema(Conn, Schema) ->
-    expect_ok(Conn, iolist_to_binary(["DROP SCHEMA ", quote(Schema)])).
 
 clean_schema(Conn, Schema) ->
     clean_views(Conn, Schema),

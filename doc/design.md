@@ -280,8 +280,6 @@ eflyway/
 -callback clean_schema(Conn, Schema)                   -> ok.
 -callback schema_exists(Conn, Schema)                  -> boolean().
 -callback schema_empty(Conn, Schema)                   -> boolean().
--callback create_schema(Conn, Schema)                  -> ok.
--callback drop_schema(Conn, Schema)                    -> ok.
 ```
 
 ### 5.3 MySQL 适配（`eflyway_db_mysql`）
@@ -344,7 +342,7 @@ CREATE TABLE "flyway_schema_history" (
 CREATE INDEX "main"."flyway_schema_history_s_idx" ON "flyway_schema_history" ("success");
 ```
 
-- schema 固定为 `main`；`schema_exists` 通过查询 `main.sqlite_master` 判断；`create_schema` / `drop_schema` 为 no-op 并打印提示。
+- schema 固定为 `main`；`schema_exists` 通过查询 `main.sqlite_master` 判断。
 - 仅支持文件库，不支持内存库（见 §5.1）。库文件不存在时由 SQLite 自动创建；但**父目录必须已存在**，否则返回友好提示且不自动建目录。
 - clean：
   1. 记录 `PRAGMA foreign_keys` 原值；
@@ -533,7 +531,7 @@ get_next_statement(Reader, Ctx):
 
 | 列 | 类型 | 说明 |
 |----|------|------|
-| `installed_rank` | INT PK | 应用顺序，从 1 递增；SCHEMA 标记固定为 0 |
+| `installed_rank` | INT PK | 应用顺序，从 1 递增 |
 | `version` | VARCHAR(50) | 版本号，可重复迁移为 NULL |
 | `description` | VARCHAR(200) | 描述，空描述在某些库用 `<< no description >>` |
 | `type` | VARCHAR(20) | `SQL` / `BASELINE` / `SCHEMA` / `DELETE` 等 |
@@ -554,7 +552,6 @@ get_next_statement(Reader, Ctx):
 - `update/2`：repair 时按 `installed_rank` 更新 description/type/checksum。
 - `delete/1`：repair 时插入一条 `type='DELETE'` 的标记行。
 - `remove_failed/2`：删除 `success = false` 的行。
-- `add_schemas_marker/1`：插入 `type='SCHEMA'` 的 schema 创建标记。
 
 ### 8.3 类型兼容
 
@@ -759,7 +756,6 @@ baseline 流程：
        - 有 baseline 标记:
              版本+描述一致 -> 跳过（成功）
              不一致 -> 报错
-       - 有 SCHEMA 标记且 baselineVersion == 0 -> 报错
        - 有非 synthetic 迁移 -> 报错
        - 表为空 -> 报错，提示先 clean
 ```
@@ -770,14 +766,10 @@ baseline 流程：
 
 ```
 1. cleanDisabled=true -> 报错
-2. 判断 schema history table 是否有 SCHEMA 标记（决定 drop schema 还是 clean schema）
-3. cleanPreSchemas
-4. 对每个 schema:
+2. 对每个 schema:
        schema 不存在 -> warn 跳过
-       有 SCHEMA 标记 -> drop_schema
        否则 -> clean_schema
-5. cleanPostSchemas
-6. schema_history:clear_cache()
+3. schema_history:clear_cache()
 ```
 
 ### 10.6 `repair`

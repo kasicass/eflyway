@@ -15,19 +15,12 @@ clean(Conn, Config) ->
             ok
     end,
     Schema = eflyway_db:schema_name(Conn, Config),
-    DropSchemas = (catch eflyway_schema_history:has_schemas_marker(Conn, Config)) =:= true,
     eflyway_log:info("Cleaning schema ~s ...", [Schema]),
     case eflyway_db:schema_exists(Conn, Schema) of
         false ->
             eflyway_log:warn("Unable to clean unknown schema: ~s", [Schema]),
             #{schemas_cleaned => [], schemas_dropped => []};
         true ->
-            case DropSchemas of
-                true ->
-                    ok = eflyway_db:drop_schema(Conn, Schema),
-                    #{schemas_cleaned => [], schemas_dropped => [Schema]};
-                false ->
-                    ok = eflyway_db:clean_schema(Conn, Schema),
-                    #{schemas_cleaned => [Schema], schemas_dropped => []}
-            end
+            ok = eflyway_db:clean_schema(Conn, Schema),
+            #{schemas_cleaned => [Schema], schemas_dropped => []}
     end.
