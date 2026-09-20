@@ -39,9 +39,6 @@ parse([Arg | Rest], Flags, Options, Commands) ->
         "-v" -> parse(Rest, [version | Flags], Options, Commands);
         "-X" -> parse(Rest, [debug | Flags], Options, Commands);
         "-q" -> parse(Rest, [quiet | Flags], Options, Commands);
-        "-n" -> parse(Rest, [noprompt | Flags], Options, Commands);
-        "-json" -> parse(Rest, [json | Flags], Options, Commands);
-        "-community" -> parse(Rest, Flags, Options, Commands);
         [$- | _] ->
             case string:split(Arg, "=", leading) of
                 [Key0, Value] ->
@@ -304,7 +301,6 @@ print_usage() ->
         "-----~n"
         "-X  : Print debug output~n"
         "-q  : Suppress all output, except for errors and warnings~n"
-        "-n  : Suppress prompting for a user and password~n"
         "-v  : Print the version and exit~n"
         "-?  : Print this usage info and exit~n~n"
         "Example~n"
