@@ -6,7 +6,7 @@
 -export([run/1]).
 
 %% Exported for testing.
--export([render_table/2, version/0]).
+-export([render_table/2, info_row/1, version/0]).
 
 -spec run([string()]) -> non_neg_integer().
 run(Args) ->

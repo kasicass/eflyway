@@ -5,7 +5,7 @@
 
 -export([refresh/3, state/1,
          all/1, current/1, pending/1, failed/1,
-         validate/1, is_applied_state/1]).
+         validate/1, validate_one/1, is_applied_state/1]).
 
 -type opts() :: #{out_of_order => boolean(),
                   pending => boolean(),

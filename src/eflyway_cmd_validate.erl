@@ -24,14 +24,16 @@ validate(Conn, Config, Resolved, Overrides) ->
                 true ->
                     #{validation_successful => false, count => 0,
                       errors => [{schema_does_not_exist,
-                                  <<"Schema ", Schema/binary, " doesn't exist yet">>}]};
+                                  <<"Schema ", Schema/binary, " doesn't exist yet">>}],
+                      results => []};
                 false ->
-                    #{validation_successful => true, count => 0, errors => []}
+                    #{validation_successful => true, count => 0, errors => [], results => []}
             end;
         true ->
             Applied = eflyway_schema_history:all_applied(Conn, Config),
             Infos = eflyway_info_service:refresh(Resolved, Applied, Opts),
-            Errors = eflyway_info_service:validate(Infos),
+            Results = [{Info, eflyway_info_service:validate_one(Info)} || Info <- Infos],
+            Errors = [{Code, Msg} || {_Info, {true, {Code, Msg}}} <- Results],
             Successful = Errors =:= [],
             case Successful of
                 true ->
@@ -41,10 +43,35 @@ validate(Conn, Config, Resolved, Overrides) ->
                         _ -> eflyway_log:info("Successfully validated ~p migrations", [N])
                     end;
                 false ->
-                    eflyway_log:error("Migrations have failed validation")
+                    eflyway_log:error("Migrations have failed validation"),
+                    print_table(Results)
             end,
-            #{validation_successful => Successful, count => length(Infos), errors => Errors}
+            #{validation_successful => Successful, count => length(Infos),
+              errors => Errors, results => Results}
     end.
+
+%% Only printed when validation fails.
+print_table(Results) ->
+    Headers = [<<"Category">>, <<"Version">>, <<"Description">>, <<"Type">>,
+               <<"Installed On">>, <<"State">>, <<"Valid">>],
+    Rows = [eflyway_cli:info_row(Info) ++ [valid_label(R)] || {Info, R} <- Results],
+    io:format(standard_error, "~s~n", [eflyway_cli:render_table(Headers, Rows)]).
+
+valid_label(false) -> <<"OK">>;
+valid_label({true, {Code, _Msg}}) -> <<"FAIL: ", (short_code(Code))/binary>>.
+
+short_code(checksum_mismatch) -> <<"checksum">>;
+short_code(type_mismatch) -> <<"type">>;
+short_code(description_mismatch) -> <<"description">>;
+short_code(resolved_versioned_migration_not_applied) -> <<"not_applied">>;
+short_code(resolved_repeatable_migration_not_applied) -> <<"not_applied">>;
+short_code(applied_versioned_migration_not_resolved) -> <<"missing">>;
+short_code(applied_repeatable_migration_not_resolved) -> <<"missing">>;
+short_code(outdated_repeatable_migration) -> <<"outdated">>;
+short_code(failed_versioned_migration) -> <<"failed">>;
+short_code(failed_repeatable_migration) -> <<"failed">>;
+short_code(schema_does_not_exist) -> <<"no_schema">>;
+short_code(Other) -> atom_to_binary(Other, utf8).
 
 opts(Config) ->
     #{out_of_order => Config#eflyway_config.out_of_order,
