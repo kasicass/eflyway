@@ -492,12 +492,14 @@ description_mismatch_message(A, R) ->
     mismatch_message(<<"description">>, migration_identifier(A),
         A#applied.description, R#resolved.description).
 
-%% Same layout as Flyway 7.5.0's MigrationInfoImpl#createMismatchMessage.
+%% Same layout as Flyway 7.5.0's MigrationInfoImpl#createMismatchMessage, except
+%% that the trailing "Either..." sentence starts on its own line (7.5.0 keeps it
+%% on the resolved line; we split it for readability).
 mismatch_message(Kind, Identifier, Applied, Resolved) ->
     <<"Migration ", Kind/binary, " mismatch for migration ", Identifier/binary, "\n",
       "-> Applied to database : ", Applied/binary, "\n",
-      "-> Resolved locally    : ", Resolved/binary,
-      ". Either revert the changes to the migration, or run repair to update the schema history.">>.
+      "-> Resolved locally    : ", Resolved/binary, "\n",
+      "Either revert the changes to the migration, or run repair to update the schema history.">>.
 
 migration_identifier(#applied{version = undefined, script = S}) -> S;
 migration_identifier(#applied{version = V}) -> <<"version ", (eflyway_migration_version:display(V))/binary>>.
