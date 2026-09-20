@@ -214,7 +214,7 @@ SELECT id, name FROM person WHERE active = 1;
 eflyway [options] command
 ```
 
-- `options`：`-key=value` 或标志（如 `-X`、`-q`、`-n`、`-?`）
+- `options`：`-key=value` 或标志（如 `-X`、`-q`、`-?`）
 - `command`：见下表
 
 ### 5.2 命令
@@ -236,7 +236,6 @@ eflyway [options] command
 | `-v` | 打印版本号并退出 |
 | `-X` | 打印调试日志 |
 | `-q` | 静默，仅输出 warning / error |
-| `-n` | 不提示输入用户名密码 |
 
 ### 5.4 核心配置选项（命令行形式）
 
