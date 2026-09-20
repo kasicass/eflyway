@@ -57,6 +57,17 @@ validate_on_migrate_test() ->
         ?assertEqual(0, maps:get(migrations_executed, Result))
     end).
 
+%% Renaming a migration (same version, new description) is a description mismatch.
+validate_description_mismatch_test() ->
+    with_env(fun(Dir, Db) ->
+        write(Dir, "V1__init.sql", <<"CREATE TABLE a (id INTEGER);">>),
+        Config = config(Dir, Db),
+        eflyway_flyway:migrate(Config),
+        ok = file:delete(filename:join(Dir, "V1__init.sql")),
+        write(Dir, "V1__initialize.sql", <<"CREATE TABLE a (id INTEGER);">>),
+        ?assertError({eflyway_error, validate_error, _, _}, eflyway_flyway:validate(Config))
+    end).
+
 %% group=true applies all pending migrations as one group.
 group_applies_all_test() ->
     with_env(fun(Dir, Db) ->

@@ -459,8 +459,14 @@ mismatch_error(#migration_info{resolved = R, applied = A}) when R =/= undefined,
                 true -> {true, {type_mismatch, type_mismatch_message(A, R)}};
                 false ->
                     case checksum_match(R, A#applied.checksum) of
-                        true -> false;
-                        false -> {true, {checksum_mismatch, checksum_mismatch_message(A, R)}}
+                        false -> {true, {checksum_mismatch, checksum_mismatch_message(A, R)}};
+                        true ->
+                            case description_match(R, A#applied.description) of
+                                true -> false;
+                                false ->
+                                    {true, {description_mismatch,
+                                            description_mismatch_message(A, R)}}
+                            end
                     end
             end
     end;
@@ -478,6 +484,18 @@ checksum_mismatch_message(A, R) ->
       (migration_identifier(A))/binary, ". Applied: ",
       (i2b(A#applied.checksum))/binary, ", Resolved: ",
       (i2b(R#resolved.checksum))/binary>>.
+
+description_match(#resolved{description = D}, Applied) ->
+    abbreviation(D) =:= Applied.
+
+abbreviation(Bin) when byte_size(Bin) =< 200 -> Bin;
+abbreviation(Bin) -> binary:part(Bin, 0, 200).
+
+description_mismatch_message(A, R) ->
+    <<"Migration description mismatch for migration ",
+      (migration_identifier(A))/binary, ". Applied: ",
+      (A#applied.description)/binary, ", Resolved: ",
+      (R#resolved.description)/binary>>.
 
 migration_identifier(#applied{version = undefined, script = S}) -> S;
 migration_identifier(#applied{version = V}) -> <<"version ", (eflyway_migration_version:display(V))/binary>>.
