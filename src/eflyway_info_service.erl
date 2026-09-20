@@ -479,11 +479,11 @@ description_mismatch_message(A, R) ->
     mismatch_message(<<"description">>, label(A),
         A#applied.description, R#resolved.description).
 
-%% Human readable migration label: "Version 1" or "Repeatable <description>".
+%% Human readable migration label: "V1" or "Repeatable <description>".
 label(#applied{version = undefined, description = D}) -> <<"Repeatable ", D/binary>>;
-label(#applied{version = V}) -> <<"Version ", (eflyway_migration_version:display(V))/binary>>;
+label(#applied{version = V}) -> <<"V", (eflyway_migration_version:display(V))/binary>>;
 label(#resolved{version = undefined, description = D}) -> <<"Repeatable ", D/binary>>;
-label(#resolved{version = V}) -> <<"Version ", (eflyway_migration_version:display(V))/binary>>.
+label(#resolved{version = V}) -> <<"V", (eflyway_migration_version:display(V))/binary>>.
 
 mismatch_message(Kind, Label, Applied, Resolved) ->
     <<Label/binary, ": migration ", Kind/binary, " mismatch\n",

@@ -29,15 +29,15 @@ is_error({eflyway_error, _, _, _}) -> true;
 is_error(_) -> false.
 
 %% @doc Format a list of {Code, Message} validation errors.
-%% Each message already carries its own "Version N: ..." label; a single error
-%% is rendered inline, several under a "N validation errors" header.
+%% Each message already carries its own "V1: ..." label; errors are rendered as
+%% a list under a "N validation error(s)" header.
 -spec format_validation([{atom(), binary()}]) -> binary().
-format_validation([{_Code, Msg}]) ->
-    Msg;
 format_validation(Errors) ->
     Items = [<<"- ", (indent(Msg))/binary>> || {_Code, Msg} <- Errors],
-    iolist_to_binary([io_lib:format("~p validation errors", [length(Errors)]), "\n",
-                      lists:join("\n", Items)]).
+    iolist_to_binary([header(length(Errors)), "\n", lists:join("\n", Items)]).
+
+header(1) -> <<"1 validation error">>;
+header(N) -> io_lib:format("~p validation errors", [N]).
 
 indent(Msg) ->
     binary:replace(Msg, <<"\n">>, <<"\n  ">>, [global]).
