@@ -382,13 +382,12 @@ validate_one(Info) ->
             end
     end.
 
-failed_error(#migration_info{resolved = undefined, applied = A}, _S) ->
-    Desc = A#applied.description,
+failed_error(#migration_info{applied = A}, _S) ->
+    Msg = <<(label(A))/binary, ": detected failed migration. Please remove any half-completed "
+            "changes then run repair to fix the schema history.">>,
     case A#applied.version of
-        undefined -> {failed_repeatable_migration, <<"Detected failed repeatable migration: ",
-                        Desc/binary, ". Please remove any half-completed changes then run repair to fix the schema history.">>};
-        V -> {failed_versioned_migration, <<"Detected failed migration to version ",
-                 (eflyway_migration_version:display(V))/binary, " (", Desc/binary, ")" >>}
+        undefined -> {failed_repeatable_migration, Msg};
+        _ -> {failed_versioned_migration, Msg}
     end.
 
 missing_error(#migration_info{resolved = undefined, applied = A}, State, Ctx) ->
@@ -399,13 +398,11 @@ missing_error(#migration_info{resolved = undefined, applied = A}, State, Ctx) ->
          andalso (not Ctx#mi_context.future
                   orelse (State =/= future_success andalso State =/= future_failed)) of
         true ->
-            case A#applied.version of
-                undefined -> {error, {applied_repeatable_migration_not_resolved,
-                    <<"Detected applied migration not resolved locally: ", (A#applied.description)/binary>>}};
-                V -> {error, {applied_versioned_migration_not_resolved,
-                    <<"Detected applied migration not resolved locally: ",
-                      (eflyway_migration_version:display(V))/binary>>}}
-            end;
+            Code = case A#applied.version of
+                       undefined -> applied_repeatable_migration_not_resolved;
+                       _ -> applied_versioned_migration_not_resolved
+                   end,
+            {error, {Code, <<(label(A))/binary, ": detected applied migration not resolved locally">>}};
         false -> ok
     end;
 missing_error(_Info, _State, _Ctx) ->
@@ -414,30 +411,12 @@ missing_error(_Info, _State, _Ctx) ->
 ignored_pending_error(Info, ignored, Ctx) ->
     case Ctx#mi_context.ignored of
         true -> false;
-        false ->
-            R = Info#migration_info.resolved,
-            case R#resolved.version of
-                undefined -> {true, {resolved_repeatable_migration_not_applied,
-                    <<"Detected resolved repeatable migration not applied to database: ",
-                      (R#resolved.description)/binary>>}};
-                V -> {true, {resolved_versioned_migration_not_applied,
-                    <<"Detected resolved migration not applied to database: ",
-                      (eflyway_migration_version:display(V))/binary>>}}
-            end
+        false -> not_applied_error(Info)
     end;
 ignored_pending_error(Info, pending, Ctx) ->
     case Ctx#mi_context.pending of
         true -> false;
-        false ->
-            R = Info#migration_info.resolved,
-            case R#resolved.version of
-                undefined -> {true, {resolved_repeatable_migration_not_applied,
-                    <<"Detected resolved repeatable migration not applied to database: ",
-                      (R#resolved.description)/binary>>}};
-                V -> {true, {resolved_versioned_migration_not_applied,
-                    <<"Detected resolved migration not applied to database: ",
-                      (eflyway_migration_version:display(V))/binary>>}}
-            end
+        false -> not_applied_error(Info)
     end;
 ignored_pending_error(Info, outdated, Ctx) ->
     case Ctx#mi_context.pending of
@@ -445,11 +424,19 @@ ignored_pending_error(Info, outdated, Ctx) ->
         false ->
             R = Info#migration_info.resolved,
             {true, {outdated_repeatable_migration,
-                <<"Detected outdated resolved repeatable migration that should be re-applied to database: ",
-                  (R#resolved.description)/binary>>}}
+                <<(label(R))/binary, ": detected outdated resolved repeatable migration "
+                  "that should be re-applied to database">>}}
     end;
 ignored_pending_error(Info, _State, _Ctx) ->
     mismatch_error(Info).
+
+not_applied_error(Info) ->
+    R = Info#migration_info.resolved,
+    Code = case R#resolved.version of
+               undefined -> resolved_repeatable_migration_not_applied;
+               _ -> resolved_versioned_migration_not_applied
+           end,
+    {true, {Code, <<(label(R))/binary, ": detected resolved migration not applied to database">>}}.
 
 mismatch_error(#migration_info{resolved = R, applied = A}) when R =/= undefined, A =/= undefined ->
     case eflyway_migration_type:is_synthetic(A#applied.type) of
@@ -474,12 +461,12 @@ mismatch_error(_) ->
     false.
 
 type_mismatch_message(A, R) ->
-    mismatch_message(<<"type">>, migration_identifier(A),
+    mismatch_message(<<"type">>, label(A),
         eflyway_migration_type:to_string(A#applied.type),
         eflyway_migration_type:to_string(R#resolved.type)).
 
 checksum_mismatch_message(A, R) ->
-    mismatch_message(<<"checksum">>, migration_identifier(A),
+    mismatch_message(<<"checksum">>, label(A),
         i2b(A#applied.checksum), i2b(R#resolved.checksum)).
 
 description_match(#resolved{description = D}, Applied) ->
@@ -489,20 +476,20 @@ abbreviation(Bin) when byte_size(Bin) =< 200 -> Bin;
 abbreviation(Bin) -> binary:part(Bin, 0, 200).
 
 description_mismatch_message(A, R) ->
-    mismatch_message(<<"description">>, migration_identifier(A),
+    mismatch_message(<<"description">>, label(A),
         A#applied.description, R#resolved.description).
 
-%% Same layout as Flyway 7.5.0's MigrationInfoImpl#createMismatchMessage, except
-%% that the trailing "Either..." sentence starts on its own line (7.5.0 keeps it
-%% on the resolved line; we split it for readability).
-mismatch_message(Kind, Identifier, Applied, Resolved) ->
-    <<"Migration ", Kind/binary, " mismatch for migration ", Identifier/binary, "\n",
+%% Human readable migration label: "Version 1" or "Repeatable <description>".
+label(#applied{version = undefined, description = D}) -> <<"Repeatable ", D/binary>>;
+label(#applied{version = V}) -> <<"Version ", (eflyway_migration_version:display(V))/binary>>;
+label(#resolved{version = undefined, description = D}) -> <<"Repeatable ", D/binary>>;
+label(#resolved{version = V}) -> <<"Version ", (eflyway_migration_version:display(V))/binary>>.
+
+mismatch_message(Kind, Label, Applied, Resolved) ->
+    <<Label/binary, ": migration ", Kind/binary, " mismatch\n",
       "-> Applied to database : ", Applied/binary, "\n",
       "-> Resolved locally    : ", Resolved/binary, "\n",
       "Either revert the changes to the migration, or run repair to update the schema history.">>.
-
-migration_identifier(#applied{version = undefined, script = S}) -> S;
-migration_identifier(#applied{version = V}) -> <<"version ", (eflyway_migration_version:display(V))/binary>>.
 
 %% ---------------------------------------------------------------------
 %% Helpers

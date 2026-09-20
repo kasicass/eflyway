@@ -89,6 +89,9 @@ run_commands(Commands, Options) ->
         lists:foreach(fun(Command) -> run_command(Command, Config) end, Commands),
         0
     catch
+        error:{eflyway_error, validate_error, Message, _Details} ->
+            io:format(standard_error, "ERROR: ~s~n", [Message]),
+            1;
         error:{eflyway_error, Code, Message, _Details} ->
             io:format(standard_error, "ERROR: ~s: ~s~n", [Code, Message]),
             1;
