@@ -24,7 +24,7 @@ validate(Config) ->
                 _ = eflyway_cmd_clean:clean(Conn, Config),
                 Result;
             {false, false} ->
-                eflyway_error:raise(validate_error, format_errors(maps:get(errors, Result)));
+                eflyway_error:raise(validate_error, eflyway_error:format_validation(maps:get(errors, Result)));
             _ ->
                 Result
         end
@@ -56,9 +56,6 @@ repair(Config) ->
         eflyway_cmd_repair:repair(Conn, Config, Resolved)
     end).
 
-format_errors(Errors) ->
-    iolist_to_binary(lists:join(<<"\n" >>,
-        [io_lib:format("~s: ~s", [Code, Msg]) || {Code, Msg} <- Errors])).
 
 -spec with_connection(#eflyway_config{}, fun((term(), map(), map()) -> R)) -> R.
 with_connection(Config, Fun) ->

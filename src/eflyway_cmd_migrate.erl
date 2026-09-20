@@ -279,11 +279,7 @@ maybe_validate_on_migrate(Conn, Config, Resolved) ->
                             ok;
                         false ->
                             eflyway_error:raise(validate_error,
-                                format_errors(maps:get(errors, Result)))
+                                eflyway_error:format_validation(maps:get(errors, Result)))
                     end
             end
     end.
-
-format_errors(Errors) ->
-    iolist_to_binary(lists:join(<<"\n">>,
-        [io_lib:format("~s: ~s", [Code, Msg]) || {Code, Msg} <- Errors])).
