@@ -6,7 +6,7 @@
 
 -export([connect/2, disconnect/1,
          execute/2, query/2, query/3,
-         transaction/2, lock/3,
+         transaction/2, lock/4,
          supports_ddl_transactions/0, supports_changing_current_schema/0,
          catalog/1, current_user/1,
          quote/1, boolean_true/0, boolean_false/0,
@@ -128,23 +128,34 @@ transaction(Conn, Fun) ->
         {aborted, Reason} -> erlang:error({mysql_transaction_aborted, Reason})
     end.
 
-lock(Conn, Table, Fun) ->
+lock(Conn, Table, RetryCount, Fun) ->
     Name = "eflyway-" ++ integer_to_list(erlang:phash2(Table)),
-    acquire(Conn, Name),
+    acquire(Conn, Name, RetryCount),
     try
         Fun()
     after
         _ = query(Conn, <<"SELECT RELEASE_LOCK(?) AS r">>, [list_to_binary(Name)])
     end.
 
-acquire(Conn, Name) ->
-    Sql = <<"SELECT GET_LOCK(?, 10) AS l">>,
+%% Try to take the named lock, retrying at 1 second intervals. A retry
+%% count of -1 retries indefinitely; 0 means a single attempt.
+acquire(Conn, Name, Retries) ->
+    Sql = <<"SELECT GET_LOCK(?, 1) AS l">>,
     case query(Conn, Sql, [list_to_binary(Name)]) of
         {ok, [#{<<"l">> := 1}]} -> ok;
         _ ->
-            timer:sleep(100),
-            acquire(Conn, Name)
+            case Retries of
+                0 ->
+                    eflyway_error:raise(lock_failed,
+                        ["Unable to obtain migration lock '", Name, "'"]);
+                _ ->
+                    timer:sleep(1000),
+                    acquire(Conn, Name, next_retries(Retries))
+            end
     end.
+
+next_retries(-1) -> -1;
+next_retries(N) -> N - 1.
 
 %% ---------------------------------------------------------------------
 %% Capabilities and metadata

@@ -120,9 +120,8 @@ known_keys() ->
 load_configuration(CliOpts, Env) ->
     Effective = maps:merge(Env, CliOpts),
     Encoding = parse_encoding(maps:get(<<"configFileEncoding">>, Effective, <<"UTF-8">>)),
-    Default = load_paths(default_conf_paths()),
-    Explicit = load_paths(binary_list_to_strings(explicit_conf_paths(Effective))),
-    _ = Encoding,
+    Default = load_paths(default_conf_paths(), Encoding),
+    Explicit = load_paths(binary_list_to_strings(explicit_conf_paths(Effective)), Encoding),
     maps:merge(Default, Explicit).
 
 default_conf_paths() ->
@@ -154,12 +153,12 @@ home_dir() ->
         Home -> Home
     end.
 
-load_paths(Paths) ->
-    lists:foldl(fun(Path, Acc) -> maps:merge(Acc, read_conf_file(Path)) end, #{}, Paths).
+load_paths(Paths, Encoding) ->
+    lists:foldl(fun(Path, Acc) -> maps:merge(Acc, read_conf_file(Path, Encoding)) end, #{}, Paths).
 
-read_conf_file(Path) ->
+read_conf_file(Path, Encoding) ->
     case file:read_file(Path) of
-        {ok, Bin} -> parse_conf(Bin);
+        {ok, Bin} -> parse_conf(eflyway_encoding:to_utf8(Bin, Encoding));
         {error, _} -> #{}
     end.
 

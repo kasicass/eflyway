@@ -48,6 +48,20 @@ repeatable_checksum_test() ->
                      R#resolved.equivalent_checksum)
     end).
 
+%% A latin1 script is converted to UTF-8 on read, so its checksum matches
+%% the equivalent UTF-8 file.
+encoding_latin1_test() ->
+    with_dir(fun(Dir) ->
+        Latin1 = <<"CREATE TABLE caf", 16#E9, " (id INTEGER);">>,
+        Utf8 = <<"CREATE TABLE caf", 16#C3, 16#A9, " (id INTEGER);">>,
+        write(Dir, "V1__init.sql", Latin1),
+        ConfigL1 = (config(Dir))#eflyway_config{encoding = latin1},
+        [R1] = eflyway_resolver:resolve(ConfigL1, eflyway_parser_sqlite:dialect()),
+        write(Dir, "V1__init.sql", Utf8),
+        [R2] = eflyway_resolver:resolve(config(Dir), eflyway_parser_sqlite:dialect()),
+        ?assertEqual(R2#resolved.checksum, R1#resolved.checksum)
+    end).
+
 %% helpers
 
 config(Dir) ->

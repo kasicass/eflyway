@@ -43,7 +43,8 @@ resolve_one(Resource, Config, Dialect, Builtins) ->
     end.
 
 checksums(Resource, Config, Builtins, Repeatable) ->
-    {ok, Raw} = file:read_file(Resource#resource.absolute),
+    {ok, Bytes} = file:read_file(Resource#resource.absolute),
+    Raw = eflyway_encoding:to_utf8(Bytes, Config#eflyway_config.encoding),
     Replaced = eflyway_placeholder:replace(Raw, Config, Builtins),
     case Repeatable of
         false ->

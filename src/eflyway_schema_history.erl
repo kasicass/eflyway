@@ -81,8 +81,8 @@ add_schemas_marker(Conn, Config, Schemas) ->
                 schema, Script, undefined, 0, true).
 
 -spec lock(term(), #eflyway_config{}, fun(() -> R)) -> R.
-lock(Conn, #eflyway_config{table = Table}, Fun) ->
-    eflyway_db:lock(Conn, Table, Fun).
+lock(Conn, #eflyway_config{table = Table, lock_retry_count = Retries}, Fun) ->
+    eflyway_db:lock(Conn, Table, Retries, Fun).
 
 -spec next_rank(term(), #eflyway_config{}) -> pos_integer().
 next_rank(Conn, Config) ->

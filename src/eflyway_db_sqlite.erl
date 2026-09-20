@@ -6,7 +6,7 @@
 
 -export([connect/2, disconnect/1,
          execute/2, query/2, query/3,
-         transaction/2, lock/3,
+         transaction/2, lock/4,
          supports_ddl_transactions/0, supports_changing_current_schema/0,
          catalog/1, current_user/1,
          quote/1, boolean_true/0, boolean_false/0,
@@ -111,8 +111,8 @@ run(Db, Sql) ->
     end.
 
 %% SQLite has no table level locking; concurrent writes are serialized by the
-%% storage engine, so lock/3 is a no-op.
-lock(_Db, _Table, Fun) ->
+%% storage engine, so lock/4 is a no-op.
+lock(_Db, _Table, _RetryCount, Fun) ->
     Fun().
 
 %% ---------------------------------------------------------------------

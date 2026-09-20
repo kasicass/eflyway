@@ -57,6 +57,55 @@ validate_on_migrate_test() ->
         ?assertEqual(0, maps:get(migrations_executed, Result))
     end).
 
+%% group=true applies all pending migrations as one group.
+group_applies_all_test() ->
+    with_env(fun(Dir, Db) ->
+        write(Dir, "V1__a.sql", <<"CREATE TABLE a (id INTEGER);">>),
+        write(Dir, "V2__b.sql", <<"CREATE TABLE b (id INTEGER);">>),
+        Config = (config(Dir, Db))#eflyway_config{group = true},
+        Result = eflyway_flyway:migrate(Config),
+        ?assertEqual(2, maps:get(migrations_executed, Result)),
+        with_conn(Config, fun(Conn) ->
+            ?assert(eflyway_db:table_exists(Conn, <<"a">>)),
+            ?assert(eflyway_db:table_exists(Conn, <<"b">>)),
+            ?assertEqual(2, count(Conn, <<"flyway_schema_history">>))
+        end)
+    end).
+
+%% A failure in a grouped run rolls the whole group back.
+group_rollback_test() ->
+    with_env(fun(Dir, Db) ->
+        write(Dir, "V1__a.sql", <<"CREATE TABLE a (id INTEGER);">>),
+        write(Dir, "V2__bad.sql", <<"SELECT * FROM nonexistent;">>),
+        Config = (config(Dir, Db))#eflyway_config{group = true},
+        ?assertError({eflyway_error, migration_sql_failed, _, _},
+                     eflyway_flyway:migrate(Config)),
+        with_conn(Config, fun(Conn) ->
+            ?assertNot(eflyway_db:table_exists(Conn, <<"a">>)),
+            ?assertEqual(0, count(Conn, <<"flyway_schema_history">>))
+        end)
+    end).
+
+%% With group=true, mixing transactional and non-transactional migrations is
+%% rejected unless mixed=true.
+mixed_migrations_rejected_test() ->
+    with_env(fun(Dir, Db) ->
+        write(Dir, "V1__pragma.sql", <<"PRAGMA foreign_keys = ON;">>),
+        write(Dir, "V2__b.sql", <<"CREATE TABLE b (id INTEGER);">>),
+        Config = (config(Dir, Db))#eflyway_config{group = true},
+        ?assertError({eflyway_error, mixed_migrations, _, _},
+                     eflyway_flyway:migrate(Config))
+    end).
+
+mixed_migrations_allowed_test() ->
+    with_env(fun(Dir, Db) ->
+        write(Dir, "V1__pragma.sql", <<"PRAGMA foreign_keys = ON;">>),
+        write(Dir, "V2__b.sql", <<"CREATE TABLE b (id INTEGER);">>),
+        Config = (config(Dir, Db))#eflyway_config{group = true, mixed = true},
+        Result = eflyway_flyway:migrate(Config),
+        ?assertEqual(2, maps:get(migrations_executed, Result))
+    end).
+
 %% helpers
 
 config(Dir, Db) ->

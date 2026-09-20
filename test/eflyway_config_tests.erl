@@ -64,6 +64,17 @@ parse_conf_test() ->
     ?assertEqual(<<"true">>, maps:get(<<"cleanDisabled">>, Conf)),
     file:delete(Path).
 
+%% A latin1 config file is decoded using configFileEncoding.
+config_file_encoding_test() ->
+    Path = tmp_file("conf"),
+    ok = file:write_file(Path, <<"flyway.url=mysql://u:p@h/caf", 16#E9>>),
+    {ok, C} = eflyway_config:load(#{
+        <<"configFiles">> => list_to_binary(Path),
+        <<"configFileEncoding">> => <<"latin1">>
+    }),
+    ?assertEqual(<<"mysql://u:p@h/caf", 16#C3, 16#A9>>, C#eflyway_config.url),
+    file:delete(Path).
+
 %% Read back through the public loader by pointing configFiles at the file.
 parse_file(Path) ->
     {ok, C} = eflyway_config:load(#{<<"configFiles">> => list_to_binary(Path)}),

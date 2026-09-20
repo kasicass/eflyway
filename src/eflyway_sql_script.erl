@@ -11,7 +11,7 @@ parse(Resource, Config, Dialect) ->
 
 -spec parse(#resource{}, #eflyway_config{}, map(), map()) -> #sql_script{}.
 parse(#resource{absolute = Path} = Resource, Config, Dialect, Builtins) ->
-    Raw = read(Path),
+    Raw = read(Path, Config#eflyway_config.encoding),
     Content = eflyway_placeholder:replace(Raw, Config, Builtins),
     Statements = eflyway_parser:parse(Content, Dialect),
     Executes = lists:all(fun(#statement{can_execute_in_transaction = B}) -> B end, Statements),
@@ -35,9 +35,9 @@ statements(#sql_script{statements = S}) -> S.
 -spec executes_in_transaction(#sql_script{}) -> boolean().
 executes_in_transaction(#sql_script{executes_in_transaction = E}) -> E.
 
-read(Path) ->
+read(Path, Encoding) ->
     case file:read_file(Path) of
-        {ok, Bin} -> Bin;
+        {ok, Bin} -> eflyway_encoding:to_utf8(Bin, Encoding);
         {error, Reason} ->
             eflyway_error:raise(resource_read_failed, [Path], #{reason => Reason})
     end.

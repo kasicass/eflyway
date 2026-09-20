@@ -7,7 +7,7 @@
 
 -export([connect/1, connect/2, disconnect/1,
          execute/2, query/2, query/3,
-         transaction/2, lock/3,
+         transaction/2, lock/4,
          supports_ddl_transactions/1, supports_changing_current_schema/1,
          catalog/1, current_user/1, installed_by/2, schema_name/2,
          server_info/1,
@@ -28,7 +28,7 @@
 -callback query(Conn :: term(), Sql :: binary()) -> {ok, [map()]} | {error, term()}.
 -callback query(Conn :: term(), Sql :: binary(), Args :: [term()]) -> {ok, [map()]} | {error, term()}.
 -callback transaction(Conn :: term(), Fun :: fun((term()) -> Result)) -> Result.
--callback lock(Conn :: term(), Table :: binary(), Fun :: fun(() -> Result)) -> Result.
+-callback lock(Conn :: term(), Table :: binary(), RetryCount :: integer(), Fun :: fun(() -> Result)) -> Result.
 -callback supports_ddl_transactions() -> boolean().
 -callback supports_changing_current_schema() -> boolean().
 -callback catalog(Conn :: term()) -> binary().
@@ -74,8 +74,8 @@ query(#conn{adapter = Mod, handle = H}, Sql, Args) -> Mod:query(H, Sql, Args).
 
 transaction(#conn{adapter = Mod, handle = H} = Conn, Fun) -> Mod:transaction(H, fun() -> Fun(Conn) end).
 
-lock(#conn{adapter = Mod, handle = H}, Table, Fun) ->
-    Mod:lock(H, Table, Fun).
+lock(#conn{adapter = Mod, handle = H}, Table, RetryCount, Fun) ->
+    Mod:lock(H, Table, RetryCount, Fun).
 
 supports_ddl_transactions(#conn{adapter = Mod}) -> Mod:supports_ddl_transactions().
 supports_changing_current_schema(#conn{adapter = Mod}) -> Mod:supports_changing_current_schema().

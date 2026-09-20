@@ -69,11 +69,18 @@ do_baseline(Conn, Config) ->
 %% ---------------------------------------------------------------------
 
 migrate_all(Conn, Config, Resolved, Total) ->
-    Count = eflyway_schema_history:lock(Conn, Config,
-        fun() -> migrate_group(Conn, Config, Resolved) end),
-    case Count of
-        0 -> Total;
-        _ -> migrate_all(Conn, Config, Resolved, Total + Count)
+    case Config#eflyway_config.group of
+        true ->
+            maybe_warn_group(Conn),
+            Total + eflyway_schema_history:lock(Conn, Config,
+                fun() -> migrate_group_all(Conn, Config, Resolved) end);
+        false ->
+            Count = eflyway_schema_history:lock(Conn, Config,
+                fun() -> migrate_group(Conn, Config, Resolved) end),
+            case Count of
+                0 -> Total;
+                _ -> migrate_all(Conn, Config, Resolved, Total + Count)
+            end
     end.
 
 migrate_group(Conn, Config, Resolved) ->
@@ -89,6 +96,82 @@ migrate_group(Conn, Config, Resolved) ->
         [First | _] ->
             apply_migration(Conn, Config, First),
             1
+    end.
+
+%% With group enabled, collect all pending migrations and apply them as one
+%% group: a single lock, and one transaction when the group is transactional.
+migrate_group_all(Conn, Config, Resolved) ->
+    Applied = eflyway_schema_history:all_applied(Conn, Config),
+    Infos = eflyway_info_service:refresh(Resolved, Applied, opts(Config)),
+    log_current(Conn, Config, Infos),
+    case eflyway_info_service:failed(Infos) of
+        [Failed | _] -> raise_failed(Conn, Config, Failed);
+        [] -> ok
+    end,
+    case eflyway_info_service:pending(Infos) of
+        [] -> 0;
+        Pending ->
+            apply_group(Conn, Config, Pending),
+            length(Pending)
+    end.
+
+apply_group(Conn, Config, Migrations) ->
+    InTxFlags = [migration_in_transaction(Conn, M) || M <- Migrations],
+    check_mixed(Config, InTxFlags),
+    case lists:all(fun(B) -> B end, InTxFlags) of
+        true ->
+            eflyway_db:transaction(Conn,
+                fun(C) -> execute_group(C, Config, Migrations, true) end);
+        false ->
+            execute_group(Conn, Config, Migrations, false)
+    end.
+
+migration_in_transaction(Conn, #migration_info{resolved = R}) ->
+    eflyway_db:supports_ddl_transactions(Conn)
+        andalso eflyway_sql_script:executes_in_transaction(R#resolved.sql_script).
+
+%% With mixed=false a group may not mix transactional and non-transactional
+%% migrations (mirrors Flyway).
+check_mixed(#eflyway_config{mixed = true}, _Flags) -> ok;
+check_mixed(_Config, Flags) ->
+    case lists:usort(Flags) of
+        [_] -> ok;
+        _ ->
+            eflyway_error:raise(mixed_migrations,
+                [<<"Detected both transactional and non-transactional migrations ",
+                   "within the same migration group (even though mixed is false)">>])
+    end.
+
+execute_group(Conn, Config, Migrations, GroupInTx) ->
+    lists:foreach(fun(M) -> execute_group_one(Conn, Config, M, GroupInTx) end, Migrations).
+
+execute_group_one(Conn, Config, #migration_info{resolved = R}, GroupInTx) ->
+    Script = R#resolved.sql_script,
+    eflyway_log:info("Migrating ~s", [migration_text(Conn, Config, R)]),
+    Start = erlang:monotonic_time(millisecond),
+    try
+        eflyway_sql_script:execute(Conn, Script),
+        ok = eflyway_schema_history:add_applied(Conn, Config,
+            R#resolved.version, R#resolved.description, R#resolved.type,
+            R#resolved.script, R#resolved.checksum, elapsed(Start), true)
+    catch
+        Class:Reason:Stacktrace ->
+            case GroupInTx of
+                true -> ok; %% the whole group is rolled back
+                false ->
+                    _ = catch eflyway_schema_history:add_applied(Conn, Config,
+                        R#resolved.version, R#resolved.description, R#resolved.type,
+                        R#resolved.script, R#resolved.checksum, elapsed(Start), false)
+            end,
+            erlang:raise(Class, Reason, Stacktrace)
+    end.
+
+maybe_warn_group(Conn) ->
+    case eflyway_db:supports_ddl_transactions(Conn) of
+        true -> ok;
+        false ->
+            eflyway_log:warn("The 'group' option is only recommended for databases "
+                             "that support DDL transactions")
     end.
 
 opts(Config) ->
