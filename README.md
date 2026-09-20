@@ -8,7 +8,6 @@ Documentation
 -------------
 
 - [Design](doc/design.md) — architecture, modules, state machine, parser.
-- [User Guide](doc/user_guide.md) — installation, CLI reference, usage.
 
 Build
 -----

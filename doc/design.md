@@ -93,8 +93,7 @@
 eflyway/
 ├── rebar.config
 ├── doc/
-│   ├── design.md
-│   └── user_guide.md
+│   └── design.md
 ├── src/
 │   ├── eflyway.app.src
 │   ├── eflyway.erl                 %% escript 入口，main/1
