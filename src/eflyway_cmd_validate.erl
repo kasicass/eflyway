@@ -53,12 +53,16 @@ validate(Conn, Config, Resolved, Overrides) ->
 %% Only printed when validation fails.
 print_table(Results) ->
     Headers = [<<"Category">>, <<"Version">>, <<"Description">>, <<"Type">>,
-               <<"Installed On">>, <<"State">>, <<"Valid">>],
-    Rows = [eflyway_cli:info_row(Info) ++ [valid_label(R)] || {Info, R} <- Results],
+               <<"Installed On">>, <<"State">>, <<"Valid">>, <<"Error Code">>],
+    Rows = [eflyway_cli:info_row(Info) ++ [valid_label(R), error_code(R)]
+            || {Info, R} <- Results],
     io:format(standard_error, "~s~n", [eflyway_cli:render_table(Headers, Rows)]).
 
 valid_label(false) -> <<"OK">>;
-valid_label({true, {Code, _Msg}}) -> <<"FAIL: ", (atom_to_binary(Code, utf8))/binary>>.
+valid_label({true, _}) -> <<"FAIL">>.
+
+error_code(false) -> <<>>;
+error_code({true, {Code, _Msg}}) -> atom_to_binary(Code, utf8).
 
 opts(Config) ->
     #{out_of_order => Config#eflyway_config.out_of_order,
