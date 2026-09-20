@@ -474,16 +474,13 @@ mismatch_error(_) ->
     false.
 
 type_mismatch_message(A, R) ->
-    <<"Migration type mismatch for migration ",
-      (migration_identifier(A))/binary, ". Applied: ",
-      (eflyway_migration_type:to_string(A#applied.type))/binary,
-      ", Resolved: ", (eflyway_migration_type:to_string(R#resolved.type))/binary>>.
+    mismatch_message(<<"type">>, migration_identifier(A),
+        eflyway_migration_type:to_string(A#applied.type),
+        eflyway_migration_type:to_string(R#resolved.type)).
 
 checksum_mismatch_message(A, R) ->
-    <<"Migration checksum mismatch for migration ",
-      (migration_identifier(A))/binary, ". Applied: ",
-      (i2b(A#applied.checksum))/binary, ", Resolved: ",
-      (i2b(R#resolved.checksum))/binary>>.
+    mismatch_message(<<"checksum">>, migration_identifier(A),
+        i2b(A#applied.checksum), i2b(R#resolved.checksum)).
 
 description_match(#resolved{description = D}, Applied) ->
     abbreviation(D) =:= Applied.
@@ -492,10 +489,15 @@ abbreviation(Bin) when byte_size(Bin) =< 200 -> Bin;
 abbreviation(Bin) -> binary:part(Bin, 0, 200).
 
 description_mismatch_message(A, R) ->
-    <<"Migration description mismatch for migration ",
-      (migration_identifier(A))/binary, ". Applied: ",
-      (A#applied.description)/binary, ", Resolved: ",
-      (R#resolved.description)/binary>>.
+    mismatch_message(<<"description">>, migration_identifier(A),
+        A#applied.description, R#resolved.description).
+
+%% Same layout as Flyway 7.5.0's MigrationInfoImpl#createMismatchMessage.
+mismatch_message(Kind, Identifier, Applied, Resolved) ->
+    <<"Migration ", Kind/binary, " mismatch for migration ", Identifier/binary, "\n",
+      "-> Applied to database : ", Applied/binary, "\n",
+      "-> Resolved locally    : ", Resolved/binary,
+      ". Either revert the changes to the migration, or run repair to update the schema history.">>.
 
 migration_identifier(#applied{version = undefined, script = S}) -> S;
 migration_identifier(#applied{version = V}) -> <<"version ", (eflyway_migration_version:display(V))/binary>>.
