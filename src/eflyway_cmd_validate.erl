@@ -58,20 +58,7 @@ print_table(Results) ->
     io:format(standard_error, "~s~n", [eflyway_cli:render_table(Headers, Rows)]).
 
 valid_label(false) -> <<"OK">>;
-valid_label({true, {Code, _Msg}}) -> <<"FAIL: ", (short_code(Code))/binary>>.
-
-short_code(checksum_mismatch) -> <<"checksum">>;
-short_code(type_mismatch) -> <<"type">>;
-short_code(description_mismatch) -> <<"description">>;
-short_code(resolved_versioned_migration_not_applied) -> <<"not_applied">>;
-short_code(resolved_repeatable_migration_not_applied) -> <<"not_applied">>;
-short_code(applied_versioned_migration_not_resolved) -> <<"missing">>;
-short_code(applied_repeatable_migration_not_resolved) -> <<"missing">>;
-short_code(outdated_repeatable_migration) -> <<"outdated">>;
-short_code(failed_versioned_migration) -> <<"failed">>;
-short_code(failed_repeatable_migration) -> <<"failed">>;
-short_code(schema_does_not_exist) -> <<"no_schema">>;
-short_code(Other) -> atom_to_binary(Other, utf8).
+valid_label({true, {Code, _Msg}}) -> <<"FAIL: ", (atom_to_binary(Code, utf8))/binary>>.
 
 opts(Config) ->
     #{out_of_order => Config#eflyway_config.out_of_order,
